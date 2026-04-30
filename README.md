@@ -1,4 +1,4 @@
-# 🔐 Scalable Authentication System (Backend Only)
+# 🔐 Authentify - Scalable Authentication System
 
 A production-oriented authentication system built with a **progressive architecture**, evolving from a basic JWT-based auth API to a **secure, scalable authentication service**.
 
@@ -17,7 +17,22 @@ This backend-only project demonstrates how authentication systems evolve in real
 The goal is to not just implement authentication, but to **understand and design secure, scalable systems**.
 
 ---
+## 🌐 Minimal Frontend (Testing Only)
 
+A lightweight frontend is included to **interact with and test the backend**.
+
+**Tech Used:**
+- HTML, CSS, JavaScript  
+- Jinja2 (only for serving pages)
+
+**Purpose:**
+- Test login, register, and protected routes  
+- Simulate real client behavior  
+- Validate access + refresh token flow  
+
+**Note:**  
+This is **not production-ready** and will be replaced with React later.
+---
 ## 🛠️ Tech Stack
 
 * **Framework:** FastAPI
