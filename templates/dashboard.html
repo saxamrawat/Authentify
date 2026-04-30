@@ -1,0 +1,15 @@
+<link rel="stylesheet" href="/static/style.css">
+<script src="/static/app.js"></script>
+
+<div class="container">
+    <h2>Dashboard</h2>
+    <p id="user">Loading...</p>
+    <button onclick="getMe()">Load User</button>
+    <button onclick="logout()">Logout</button>
+</div>
+<script>
+    requireAuth();
+</script>
+<script>
+    getMe();
+</script>

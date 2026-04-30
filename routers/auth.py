@@ -21,7 +21,7 @@ router = APIRouter(
 
 # Authentication and Hashed Password Dependencies
 bcrypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_bearer = OAuth2PasswordBearer(tokenUrl="auth/token")
+oauth2_bearer = OAuth2PasswordBearer(tokenUrl="auth/login")
 load_dotenv()
 SECRET_KEY = os.getenv("SECRET_AUTH_KEY")
 ALGORITHM = os.getenv("ALGORITHM")
@@ -125,7 +125,7 @@ async def create_user(create_user_request : CreateUserRequest, db: db_dependency
     db.add(create_user_model)
     db.commit()
 
-@router.post("/token", response_model=Token)
+@router.post("/login", response_model=Token)
 async def login_for_access_token(form_data : Annotated[OAuth2PasswordRequestForm, Depends()], db : db_dependency):
     user = authenticate_user(form_data.username, form_data.password, db)
 
@@ -133,9 +133,8 @@ async def login_for_access_token(form_data : Annotated[OAuth2PasswordRequestForm
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not authenticate user.")
 
     # Creating both access and refresh tokens
-    access_token = create_access_token(user.username, user.id, timedelta(minutes=20))
+    access_token = create_access_token(user.username, user.id, timedelta(minutes=1))
     refresh_token = create_refresh_token(user.id, timedelta(days=2))
-    print(refresh_token)
     # Hashing refresh token
     hashed_refresh = bcrypt_context.hash(refresh_token)
     # Storing refresh token in db
@@ -196,7 +195,7 @@ async def refresh_for_refresh_token(request : RefreshRequest, db : db_dependency
     new_access_token = create_access_token(
         username = user.username,
         user_id = int(user_id),
-        expire_delta= timedelta(minutes=20)
+        expire_delta= timedelta(minutes=1)
     )
 
     return {
