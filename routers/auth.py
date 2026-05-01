@@ -133,7 +133,7 @@ async def login_for_access_token(form_data : Annotated[OAuth2PasswordRequestForm
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not authenticate user.")
 
     # Creating both access and refresh tokens
-    access_token = create_access_token(user.username, user.id, timedelta(minutes=1))
+    access_token = create_access_token(user.username, user.id, timedelta(minutes=20))
     refresh_token = create_refresh_token(user.id, timedelta(days=2))
     # Hashing refresh token
     hashed_refresh = bcrypt_context.hash(refresh_token)
@@ -195,7 +195,7 @@ async def refresh_for_refresh_token(request : RefreshRequest, db : db_dependency
     new_access_token = create_access_token(
         username = user.username,
         user_id = int(user_id),
-        expire_delta= timedelta(minutes=1)
+        expire_delta= timedelta(minutes=20)
     )
 
     return {
