@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from starlette import status
 from database import SessionLocal
-from models import Users, RefreshToken
+from models import Users, RefreshToken, EmailVerification
 from passlib.context import CryptContext
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from jose import jwt, JWTError
@@ -84,6 +84,16 @@ def create_refresh_token(user_id : int, expire_delta : timedelta):
 
     return jwt.encode(encode, SECRET_KEY, ALGORITHM)
 
+def create_email_verification_token(user_id: int, expire_delta : timedelta):
+    encode = {
+        "sub" : str(user_id),
+        "token_type" : "email_verification"
+    }
+    expires = datetime.now(timezone.utc) + expire_delta
+    encode.update({"exp" : expires})
+
+    return jwt.encode(encode, SECRET_KEY, ALGORITHM)
+
 async def get_current_user(token : Annotated[str, Depends(oauth2_bearer)], db : db_dependency):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -122,6 +132,27 @@ async def create_user(create_user_request : CreateUserRequest, db: db_dependency
 
     db.add(create_user_model)
     db.commit()
+
+    #Retrieving User
+    db.refresh(create_user_model)
+
+    #Creating and Hashing Email Verification Token
+    email_verification_token = create_email_verification_token(create_user_model.id, timedelta(minutes=15))
+
+    hashed_email_token = bcrypt_context.hash(email_verification_token)
+
+    #Creating and committing an entry to the DB
+    email_verification_model = EmailVerification(
+        user_id = create_user_model.id,
+        hashed_token = hashed_email_token,
+        expires_at = datetime.now(timezone.utc) + timedelta(minutes=15)
+    )
+
+    db.add(email_verification_model)
+    db.commit()
+
+    #Sending Verification Email to User(only printing as of now)
+    print(f"Verification link: http://127.0.0.1:8000/auth/verify-email?token={email_verification_token}")
 
 @router.post("/login", response_model=Token)
 async def login_for_access_token(form_data : Annotated[OAuth2PasswordRequestForm, Depends()], db : db_dependency):
@@ -224,6 +255,53 @@ async def refresh_for_refresh_token(request : RefreshRequest, db : db_dependency
         "token_type" : "bearer"
     }
 
+@router.get("/verify-email")
+async def verify_email(token: str, db: db_dependency):
+    # Decode JWT
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except JWTError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+
+    # Check token type
+    if payload.get("token_type") != "email_verification":
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+
+    user_id = payload.get("sub")
+
+    # Find matching token in DB
+    tokens = db.query(EmailVerification).filter(EmailVerification.user_id == user_id).all()
+    valid_token = None
+
+    for t in tokens:
+        if bcrypt_context.verify(token, t.hashed_token):
+            valid_token = t
+            break
+
+    if not valid_token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+
+    # Check expiry
+    if valid_token.expires_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+
+    # Get user
+    user = db.query(Users).filter(Users.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+
+    # Mark verified
+    user.is_verified = True
+
+    # Cleanup all tokens for this user
+    db.query(EmailVerification).filter(EmailVerification.user_id == user_id).delete()
+
+    db.add(user)
+    db.commit()
+
+    return {"message": "Email verified successfully"}
+
+#Protected Routes
 @router.get("/me")
 async def get_me(current_user : Annotated[Users, Depends(get_current_user)]):
     return {
