@@ -56,12 +56,11 @@ class Token(BaseModel):
 
 # Helper Functions
 
-def authenticate_user(username : str, password : str, db):
+def check_user(username : str, db):
     user = db.query(Users).filter(Users.username == username).first()
     if not user:
         return False
-    if not bcrypt_context.verify(password, user.hashed_password):
-        return False
+
     return user
 
 def create_access_token(username : str, user_id : int, expire_delta : timedelta):
@@ -119,7 +118,6 @@ async def create_user(create_user_request : CreateUserRequest, db: db_dependency
         last_name = create_user_request.last_name,
         role=create_user_request.role,
         hashed_password= bcrypt_context.hash(create_user_request.password),
-        is_active=True
     )
 
     db.add(create_user_model)
@@ -127,10 +125,32 @@ async def create_user(create_user_request : CreateUserRequest, db: db_dependency
 
 @router.post("/login", response_model=Token)
 async def login_for_access_token(form_data : Annotated[OAuth2PasswordRequestForm, Depends()], db : db_dependency):
-    user = authenticate_user(form_data.username, form_data.password, db)
+    user = check_user(form_data.username, db)
 
     if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not authenticate user.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+
+    #Verified or not
+    if not user.is_verified:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+
+    #Check is_locked/locked_until
+    if user.locked_until and user.locked_until > datetime.now(timezone.utc):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"User temporarily locked.")
+    else:
+        user.locked_until = None
+
+    #authenticate user
+    if not bcrypt_context.verify(form_data.password, user.hashed_password):
+        user.failed_attempts += 1
+        if user.failed_attempts == 3:
+            user.locked_until = datetime.now(timezone.utc) + timedelta(days=3)
+        db.add(user)
+        db.commit()
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+    user.failed_attempts = 0
+    db.add(user)
+    db.commit()
 
     # Creating both access and refresh tokens
     access_token = create_access_token(user.username, user.id, timedelta(minutes=20))
