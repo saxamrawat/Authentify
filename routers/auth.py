@@ -1,12 +1,12 @@
 from datetime import datetime, timedelta, timezone
-from fastapi import HTTPException
+from fastapi import HTTPException, Query
 from typing import Annotated
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from starlette import status
 from database import SessionLocal
-from models import Users, RefreshToken, EmailVerification
+from models import Users, RefreshToken, EmailVerification, PasswordReset
 from passlib.context import CryptContext
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from jose import jwt, JWTError
@@ -88,6 +88,16 @@ def create_email_verification_token(user_id: int, expire_delta : timedelta):
     encode = {
         "sub" : str(user_id),
         "token_type" : "email_verification"
+    }
+    expires = datetime.now(timezone.utc) + expire_delta
+    encode.update({"exp" : expires})
+
+    return jwt.encode(encode, SECRET_KEY, ALGORITHM)
+
+def create_password_reset_token(user_id: int, expire_delta : timedelta):
+    encode = {
+        "sub" : str(user_id),
+        "token_type" : "password_reset"
     }
     expires = datetime.now(timezone.utc) + expire_delta
     encode.update({"exp" : expires})
@@ -255,6 +265,8 @@ async def refresh_for_refresh_token(request : RefreshRequest, db : db_dependency
         "token_type" : "bearer"
     }
 
+# Email Verification Endpoints
+
 @router.get("/verify-email")
 async def verify_email(token: str, db: db_dependency):
     # Decode JWT
@@ -300,6 +312,87 @@ async def verify_email(token: str, db: db_dependency):
     db.commit()
 
     return {"message": "Email verified successfully"}
+
+# Password Reset Endpoints
+
+@router.post("/request-password-reset")
+async def request_password_reset(email : str, db :db_dependency):
+    user = db.query(Users).filter(Users.email == email).first()
+
+    if not user:
+        return {"message": "If the account exists, a reset link has been sent."}
+
+    db.query(PasswordReset).filter(PasswordReset.user_id == user.id).delete()
+    db.commit()
+
+    reset_token = create_password_reset_token(user.id, timedelta(minutes=15))
+    hashed_reset_token = bcrypt_context.hash(reset_token)
+    password_reset_model = PasswordReset(
+        user_id = user.id,
+        hashed_token = hashed_reset_token,
+        expires_at = datetime.now(timezone.utc) + timedelta(minutes=15)
+    )
+
+    db.add(password_reset_model)
+    db.commit()
+
+    #Send email(only printing as of now)
+    print(f"Password request link: http://127.0.0.1:8000/auth/reset-password?token={reset_token}&new_password=")
+    return {"message" : "If the account exists, a reset link has been sent."}
+
+@router.post("/reset-password")
+async def reset_password(token : str, db: db_dependency, new_password : str = Query(min_length = 8)):
+    # Decode Token
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except JWTError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+
+    # Validate Token Type
+
+    if not payload.get("token_type") == "password_reset":
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+
+    # find matching DB token
+    user_id = int(payload.get("sub"))
+
+    tokens = db.query(PasswordReset).filter(PasswordReset.user_id == user_id).all()
+    valid_token = None
+
+    for t in tokens:
+        if bcrypt_context.verify(token, t.hashed_token):
+            valid_token = t
+            break
+
+    if not valid_token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+
+    # check expiry
+    if valid_token.expires_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+    # find user
+    user = db.query(Users).filter(Users.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+    # hash new password
+    hashed_new_password = bcrypt_context.hash(new_password)
+    # update password
+    user.hashed_password = hashed_new_password
+
+    # delete reset tokens
+    db.query(PasswordReset).filter(PasswordReset.user_id == user_id).delete()
+
+    # invalidate sessions(recommended) i.e. removing for Refresh Tokens
+    db.query(RefreshToken).filter(RefreshToken.user_id == user_id).delete()
+
+    # reset user state
+    user.failed_attempts = 0
+    user.locked_until = None
+
+    db.add(user)
+    db.commit()
+
+    return {"message" : "Password Reset Successful"}
 
 #Protected Routes
 @router.get("/me")

@@ -35,3 +35,12 @@ class EmailVerification(Base):
     user_id = Column(Integer, ForeignKey("users.id"))
     hashed_token = Column(String)
     expires_at = Column(DateTime(timezone=True))
+
+#Password Reset Model
+class PasswordReset(Base):
+    __tablename__ = "password_reset"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    hashed_token = Column(String)
+    expires_at = Column(DateTime(timezone=True))
