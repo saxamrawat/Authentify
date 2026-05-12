@@ -1,12 +1,21 @@
 <link rel="stylesheet" href="/static/style.css">
+
+<script>
+    const API = "{{ frontend_url }}";
+</script>
+
 <script src="/static/app.js"></script>
 
 <div class="container">
     <h2>Login</h2>
+
     <input id="username" placeholder="Username">
     <input id="password" type="password" placeholder="Password">
+
     <button onclick="login()">Login</button>
+
     <p><a href="/register">Register</a></p>
+
     <script>
         redirectIfLoggedIn();
     </script>

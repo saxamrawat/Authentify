@@ -1,5 +1,3 @@
-const API = "http://127.0.0.1:8000/auth";
-
 // Store tokens
 function saveTokens(data) {
     localStorage.setItem("access_token", data.access_token);
@@ -15,7 +13,7 @@ async function login() {
     formData.append("username", username);
     formData.append("password", password);
 
-    const res = await fetch(`${API}/login`, {
+    const res = await fetch(`${API}/auth/login`, {
         method: "POST",
         headers: {
             "Content-Type": "application/x-www-form-urlencoded"
@@ -44,7 +42,7 @@ async function register() {
         role: "user"
     };
 
-    const res = await fetch(`${API}/`, {
+    const res = await fetch(`${API}/auth/`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json"
@@ -64,7 +62,7 @@ async function register() {
 async function getMe() {
     let token = getAccessToken();
 
-    let res = await fetch("http://127.0.0.1:8000/auth/me", {
+    let res = await fetch(`${API}/auth/me`, {
         headers: {
             "Authorization": `Bearer ${token}`
         }
@@ -82,7 +80,7 @@ async function getMe() {
         // retry request
         token = getAccessToken();
 
-        res = await fetch("http://127.0.0.1:8000/auth/me", {
+        res = await fetch(`${API}/auth/me`, {
             headers: {
                 "Authorization": `Bearer ${token}`
             }
@@ -100,7 +98,7 @@ async function refreshAccessToken() {
 
     if (!refresh_token) return false;
 
-    const res = await fetch("http://127.0.0.1:8000/auth/refresh", {
+    const res = await fetch(`${API}/auth/refresh`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json"
@@ -135,6 +133,7 @@ function getRefreshToken() {
 // Protect dashboard
 function requireAuth() {
     const token = getAccessToken();
+
     if (!token) {
         window.location.href = "/";
     }
@@ -143,6 +142,7 @@ function requireAuth() {
 // Prevent logged-in users from seeing login page
 function redirectIfLoggedIn() {
     const token = getAccessToken();
+
     if (token) {
         window.location.href = "/dashboard";
     }
