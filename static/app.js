@@ -13,7 +13,7 @@ async function login() {
     formData.append("username", username);
     formData.append("password", password);
 
-    const res = await fetch(`${API}/auth/login`, {
+    const res = await fetch(`/auth/login`, {
         method: "POST",
         headers: {
             "Content-Type": "application/x-www-form-urlencoded"
@@ -42,7 +42,7 @@ async function register() {
         role: "user"
     };
 
-    const res = await fetch(`${API}/auth/`, {
+    const res = await fetch(`/auth/`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json"
@@ -62,7 +62,7 @@ async function register() {
 async function getMe() {
     let token = getAccessToken();
 
-    let res = await fetch(`${API}/auth/me`, {
+    let res = await fetch(`/auth/me`, {
         headers: {
             "Authorization": `Bearer ${token}`
         }
@@ -80,7 +80,7 @@ async function getMe() {
         // retry request
         token = getAccessToken();
 
-        res = await fetch(`${API}/auth/me`, {
+        res = await fetch(`/auth/me`, {
             headers: {
                 "Authorization": `Bearer ${token}`
             }
@@ -98,7 +98,7 @@ async function refreshAccessToken() {
 
     if (!refresh_token) return false;
 
-    const res = await fetch(`${API}/auth/refresh`, {
+    const res = await fetch(`/auth/refresh`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json"

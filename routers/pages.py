@@ -13,7 +13,6 @@ async def login_page(request: Request):
         "login.html",
         {
             "request": request,
-            "frontend_url": request.app.state.frontend_url
         }
     )
 
@@ -23,7 +22,6 @@ async def register_page(request: Request):
         "register.html",
         {
             "request": request,
-            "frontend_url": request.app.state.frontend_url
         }
     )
 
@@ -33,6 +31,5 @@ async def dashboard_page(request: Request):
         "dashboard.html",
         {
             "request": request,
-            "frontend_url": request.app.state.frontend_url
         }
     )
