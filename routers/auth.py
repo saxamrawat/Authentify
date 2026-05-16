@@ -54,6 +54,9 @@ class Token(BaseModel):
     refresh_token : str
     token_type : str
 
+class LogOutRequest(BaseModel):
+    refresh_token : str
+
 # Helper Functions
 
 def check_user(username : str, db):
@@ -264,6 +267,46 @@ async def refresh_for_refresh_token(request : RefreshRequest, db : db_dependency
         "refresh_token" : refresh_token,
         "token_type" : "bearer"
     }
+
+#Logout
+@router.post("/logout")
+async def logout(logout_request : LogOutRequest, db : db_dependency):
+    refresh_token = logout_request.refresh_token
+
+    #decode token
+    try:
+        payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+    except JWTError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+
+    # Validate Token type
+    if payload.get("token_type") != "refresh":
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token type")
+
+    user_id = int(payload.get("sub"))
+
+    if user_id is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+
+    # Find Matching Token in DB
+    tokens = db.query(RefreshToken).filter(RefreshToken.user_id == user_id).filter(RefreshToken.is_revoked == False).all()
+
+    valid_token = None
+
+    for token in tokens:
+        if bcrypt_context.verify(refresh_token, token.hashed_token):
+            valid_token = token
+            break
+
+    if not valid_token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh Token not recognized")
+
+    valid_token.is_revoked = True
+
+    db.commit()
+
+    return {"message" : "Logout Successful"}
+
 
 # Email Verification Endpoints
 

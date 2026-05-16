@@ -117,8 +117,24 @@ async function refreshAccessToken() {
     return true;
 }
 
-function logout() {
+async function logout() {
+    const refresh_token = localStorage.getItem("refresh_token");
+
+    // Call backend logout endpoint
+    await fetch("/auth/logout", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            refresh_token: refresh_token
+        })
+    });
+
+    // Clear frontend session
     localStorage.clear();
+
+    // Redirect
     window.location.href = "/";
 }
 
