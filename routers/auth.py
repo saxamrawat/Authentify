@@ -7,12 +7,12 @@ from sqlalchemy.orm import Session
 from starlette import status
 from database import SessionLocal
 from models import Users, RefreshToken, EmailVerification, PasswordReset
+from dependencies.permissions import get_current_user
 from passlib.context import CryptContext
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from jose import jwt, JWTError
 import os
 from dotenv import load_dotenv
-from typing_extensions import deprecated
 
 router = APIRouter(
     prefix="/auth",
@@ -66,10 +66,11 @@ def check_user(username : str, db):
 
     return user
 
-def create_access_token(username : str, user_id : int, expire_delta : timedelta):
+def create_access_token(username : str, user_id : int, role : str, expire_delta : timedelta):
     encode = {
         "sub" : username,
         "id" : user_id,
+        "role" : role,
         "token_type" : "access"
     }
     expires = datetime.now(timezone.utc) + expire_delta
@@ -106,29 +107,6 @@ def create_password_reset_token(user_id: int, expire_delta : timedelta):
     encode.update({"exp" : expires})
 
     return jwt.encode(encode, SECRET_KEY, ALGORITHM)
-
-async def get_current_user(token : Annotated[str, Depends(oauth2_bearer)], db : db_dependency):
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-
-        if payload.get("token_type") != "access":
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Token Type")
-
-        username: str = payload.get("sub")
-        user_id: str = int(payload.get("id"))
-
-        if username is None or user_id is None:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not authenticate user.")
-
-        user = db.query(Users).filter(Users.id == user_id).first()
-        if not user:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found.")
-
-        return user
-
-    except JWTError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not authenticate user.")
-
 
 # CRUD Operations
 
@@ -197,7 +175,7 @@ async def login_for_access_token(form_data : Annotated[OAuth2PasswordRequestForm
     db.commit()
 
     # Creating both access and refresh tokens
-    access_token = create_access_token(user.username, user.id, timedelta(minutes=20))
+    access_token = create_access_token(user.username, user.id, user.role, timedelta(minutes=20))
     refresh_token = create_refresh_token(user.id, timedelta(days=2))
     # Hashing refresh token
     hashed_refresh = bcrypt_context.hash(refresh_token)
