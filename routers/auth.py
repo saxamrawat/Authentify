@@ -1,13 +1,14 @@
 from datetime import datetime, timedelta, timezone
-from fastapi import HTTPException, Query
+from fastapi import HTTPException, Query, APIRouter, Depends, Request
 from typing import Annotated
-from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from starlette import status
 from database import SessionLocal
 from models import Users, RefreshToken, EmailVerification, PasswordReset
 from dependencies.permissions import get_current_user
+from utils.token_utils import create_access_token, create_refresh_token, create_email_verification_token, create_password_reset_token, revoke_current_session, revoke_all_sessions
+from utils.email_utils import send_verification_email, send_password_reset_email
 from passlib.context import CryptContext
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from jose import jwt, JWTError
@@ -66,47 +67,38 @@ def check_user(username : str, db):
 
     return user
 
-def create_access_token(username : str, user_id : int, role : str, expire_delta : timedelta):
-    encode = {
-        "sub" : username,
-        "id" : user_id,
-        "role" : role,
-        "token_type" : "access"
-    }
-    expires = datetime.now(timezone.utc) + expire_delta
-    encode.update({"exp" : expires})
+# In-Memory Rate Limiter
+rate_limiter = {}
 
-    return jwt.encode(encode, SECRET_KEY, ALGORITHM)
+def check_rate_limit(ip: str, limit: int, window: timedelta):
 
-def create_refresh_token(user_id : int, expire_delta : timedelta):
-    encode = {
-        "sub": str(user_id),
-        "token_type" : "refresh"
-    }
-    expires = datetime.now(timezone.utc) + expire_delta
-    encode.update({"exp": expires})
+    current_time = datetime.now(timezone.utc)
 
-    return jwt.encode(encode, SECRET_KEY, ALGORITHM)
+    # Create IP bucket
+    if ip not in rate_limiter:
+        rate_limiter[ip] = []
 
-def create_email_verification_token(user_id: int, expire_delta : timedelta):
-    encode = {
-        "sub" : str(user_id),
-        "token_type" : "email_verification"
-    }
-    expires = datetime.now(timezone.utc) + expire_delta
-    encode.update({"exp" : expires})
+    # Remove expired timestamps
+    rate_limiter[ip] = [
+        timestamp
+        for timestamp in rate_limiter[ip]
+        if current_time - timestamp < window
+    ]
 
-    return jwt.encode(encode, SECRET_KEY, ALGORITHM)
+    # Remove empty IPs (optional cleanup)
+    if len(rate_limiter[ip]) == 0:
+        rate_limiter.pop(ip, None)
+        rate_limiter[ip] = []
 
-def create_password_reset_token(user_id: int, expire_delta : timedelta):
-    encode = {
-        "sub" : str(user_id),
-        "token_type" : "password_reset"
-    }
-    expires = datetime.now(timezone.utc) + expire_delta
-    encode.update({"exp" : expires})
+    # Rate limit exceeded
+    if len(rate_limiter[ip]) >= limit:
+        return False
 
-    return jwt.encode(encode, SECRET_KEY, ALGORITHM)
+    # Store current request timestamp
+    rate_limiter[ip].append(current_time)
+
+    return True
+
 
 # CRUD Operations
 
@@ -142,11 +134,32 @@ async def create_user(create_user_request : CreateUserRequest, db: db_dependency
     db.add(email_verification_model)
     db.commit()
 
-    #Sending Verification Email to User(only printing as of now)
-    print(f"Verification link: http://127.0.0.1:8000/auth/verify-email?token={email_verification_token}")
+    #Sending Verification Email to User
+    frontend_url = os.getenv("FRONTEND_URL")
+
+    verification_link = (
+        f"{frontend_url}/auth/verify-email"
+        f"?token={email_verification_token}"
+    )
+    try:
+        send_verification_email(
+            create_user_model.email,
+            verification_link
+        )
+    except Exception as e:
+        print(e)
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to send verification email"
+        )
 
 @router.post("/login", response_model=Token)
-async def login_for_access_token(form_data : Annotated[OAuth2PasswordRequestForm, Depends()], db : db_dependency):
+async def login_for_access_token(request : Request, form_data : Annotated[OAuth2PasswordRequestForm, Depends()], db : db_dependency):
+    ip = request.client.host
+
+    if not check_rate_limit(ip, 5, timedelta(minutes=1)):
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many login attempts. Try again later.")
+
     user = check_user(form_data.username, db)
 
     if not user:
@@ -158,15 +171,16 @@ async def login_for_access_token(form_data : Annotated[OAuth2PasswordRequestForm
 
     #Check is_locked/locked_until
     if user.locked_until and user.locked_until > datetime.now(timezone.utc):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"User temporarily locked.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User temporarily locked.")
     else:
         user.locked_until = None
 
     #authenticate user
     if not bcrypt_context.verify(form_data.password, user.hashed_password):
         user.failed_attempts += 1
-        if user.failed_attempts == 3:
+        if user.failed_attempts >= 3:
             user.locked_until = datetime.now(timezone.utc) + timedelta(days=3)
+            revoke_all_sessions(user.id, db)
         db.add(user)
         db.commit()
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
@@ -216,7 +230,7 @@ async def refresh_for_refresh_token(request : RefreshRequest, db : db_dependency
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
 
     # Find Matching Token in DB
-    tokens = db.query(RefreshToken).filter(RefreshToken.user_id == user_id).filter(RefreshToken.is_revoked == False).all()
+    tokens = db.query(RefreshToken).filter(RefreshToken.user_id == user_id).all()
 
     valid_token = None
 
@@ -232,17 +246,44 @@ async def refresh_for_refresh_token(request : RefreshRequest, db : db_dependency
     if valid_token.expires_at < datetime.now(timezone.utc):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh Token Expired")
 
+    # Reuse Detection
+    if valid_token.is_revoked:
+        revoke_all_sessions(user_id, db)
+        db.commit()
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session Security Violation Detected.")
+
+    # Revoking old refresh token
+    valid_token.is_revoked = True
+
     # Generate New Access Token
     user = db.query(Users).filter(Users.id == valid_token.user_id).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
     new_access_token = create_access_token(
         username = user.username,
         user_id = int(user_id),
+        role = user.role,
         expire_delta= timedelta(minutes=20)
     )
 
+    #Refresh Token Rotation
+
+    new_refresh_token = create_refresh_token(user.id, timedelta(days=2))
+    # Hashing refresh token
+    hashed_refresh = bcrypt_context.hash(new_refresh_token)
+    # Storing refresh token in db
+    refresh_token_model = RefreshToken(
+        user_id=user.id,
+        hashed_token=hashed_refresh,
+        expires_at=datetime.now(timezone.utc) + timedelta(days=2),
+        is_revoked=False
+    )
+    db.add(refresh_token_model)
+    db.commit()
+
     return {
         "access_token" : new_access_token,
-        "refresh_token" : refresh_token,
+        "refresh_token" : new_refresh_token,
         "token_type" : "bearer"
     }
 
@@ -266,22 +307,8 @@ async def logout(logout_request : LogOutRequest, db : db_dependency):
     if user_id is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
 
-    # Find Matching Token in DB
-    tokens = db.query(RefreshToken).filter(RefreshToken.user_id == user_id).filter(RefreshToken.is_revoked == False).all()
-
-    valid_token = None
-
-    for token in tokens:
-        if bcrypt_context.verify(refresh_token, token.hashed_token):
-            valid_token = token
-            break
-
-    if not valid_token:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh Token not recognized")
-
-    valid_token.is_revoked = True
-
-    db.commit()
+    # Revoke Current Session
+    revoke_current_session(refresh_token, user_id, db)
 
     return {"message" : "Logout Successful"}
 
@@ -357,9 +384,26 @@ async def request_password_reset(email : str, db :db_dependency):
     db.add(password_reset_model)
     db.commit()
 
-    #Send email(only printing as of now)
-    print(f"Password request link: http://127.0.0.1:8000/auth/reset-password?token={reset_token}&new_password=")
+    #Send email for Password Reset
+    frontend_url = os.getenv("FRONTEND_URL")
+
+    reset_link = (
+        f"{frontend_url}/auth/reset-password"
+        f"?token={reset_token}"
+    )
+    try:
+        send_password_reset_email(
+            user.email,
+            reset_link
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to send password reset email"
+        )
+
     return {"message" : "If the account exists, a reset link has been sent."}
+
 
 @router.post("/reset-password")
 async def reset_password(token : str, db: db_dependency, new_password : str = Query(min_length = 8)):

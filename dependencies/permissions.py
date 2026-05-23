@@ -48,6 +48,9 @@ async def get_current_user(token : Annotated[str, Depends(oauth2_bearer)], db : 
         if not user:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found.")
 
+        if user.locked_until and user.locked_until > datetime.now(timezone.utc):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User temporarily locked.")
+
         return user
 
     except JWTError:

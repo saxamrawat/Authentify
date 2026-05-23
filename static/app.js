@@ -113,6 +113,7 @@ async function refreshAccessToken() {
     const data = await res.json();
 
     localStorage.setItem("access_token", data.access_token);
+    localStorage.setItem("refresh_token", data.refresh_token);
 
     return true;
 }
