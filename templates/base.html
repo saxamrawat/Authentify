@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>
+        {% block title %}{% endblock %} | Authentify
+    </title>
+
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+
+    <nav class="navbar">
+
+        <div class="logo">
+            <a href="/" class="unstyled-link">Auth<span>entify</span></a>
+        </div>
+
+        <div class="nav-links">
+            <a href="/dashboard">Dashboard</a>
+            <a href="/admin">Admin</a>
+        </div>
+
+    </nav>
+
+    <div class="page-container">
+
+        {% block content %}
+        {% endblock %}
+
+    </div>
+
+    <script src="/static/app.js"></script>
+
+    <script>
+
+    if (window.location.pathname === "/dashboard") {
+        requireAuth();
+        getMe();
+    }
+
+    if (window.location.pathname === "/admin") {
+        requireAuth();
+        loadUsers();
+    }
+
+    </script>
+
+</body>
+
+</html>

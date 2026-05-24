@@ -1,17 +1,33 @@
-<link rel="stylesheet" href="/static/style.css">
+{% extends "base.html" %}
 
-<script src="/static/app.js"></script>
+{% block title %}
+Dashboard
+{% endblock %}
 
-<div class="container">
-    <h2>Dashboard</h2>
+{% block content %}
 
-    <p id="user">Loading...</p>
+<div class="dashboard-card">
 
-    <button onclick="getMe()">Load User</button>
-    <button onclick="logout()">Logout</button>
+    <h1 id="welcome-message">
+        Welcome Back
+    </h1>
+
+    <p id="user-info"></p>
+
+    <div style="margin-top: 30px;">
+
+        <button onclick="window.location.href='/admin'">
+            Admin Panel
+        </button>
+
+        <br><br>
+
+        <button onclick="logout()">
+            Logout
+        </button>
+
+    </div>
+
 </div>
 
-<script>
-    requireAuth();
-    getMe();
-</script>
+{% endblock %}

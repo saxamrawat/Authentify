@@ -89,8 +89,8 @@ async function getMe() {
 
     const data = await res.json();
 
-    document.getElementById("user").innerText =
-        `Welcome ${data.username} (${data.email})`;
+    document.getElementById("welcome-message").innerText = `Welcome Back, ${data.first_name || data.username}`;
+    document.getElementById("user-info").innerText = `Username: ${data.username} | Email: ${data.email}`;
 }
 
 async function refreshAccessToken() {
@@ -164,3 +164,166 @@ function redirectIfLoggedIn() {
         window.location.href = "/dashboard";
     }
 }
+
+async function verifyEmail() {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("token");
+
+    if (!token) {
+        document.getElementById("status").innerText =
+            "Invalid verification link.";
+        return;
+    }
+
+    const res = await fetch(`/auth/verify-email?token=${token}`);
+
+    const data = await res.json();
+
+    if (res.ok) {
+        document.getElementById("status").innerText =
+            "Email verified successfully!";
+    } else {
+        document.getElementById("status").innerText =
+            data.detail;
+    }
+}
+
+async function requestPasswordReset() {
+    const email = document.getElementById("email").value;
+
+    const res = await fetch(
+        `/auth/request-password-reset?email=${email}`,
+        {
+            method: "POST"
+        }
+    );
+
+    const data = await res.json();
+
+    alert(data.message);
+}
+
+async function resetPassword() {
+    const params = new URLSearchParams(window.location.search);
+
+    const token = params.get("token");
+
+    const new_password =
+        document.getElementById("new_password").value;
+
+    const res = await fetch(
+        `/auth/reset-password?token=${token}&new_password=${new_password}`,
+        {
+            method: "POST"
+        }
+    );
+
+    const data = await res.json();
+
+    document.getElementById("status").innerText =
+        data.message || data.detail;
+}
+
+async function loadUsers() {
+    const token = getAccessToken();
+
+    const res = await fetch("/admin/users", {
+        headers: {
+            "Authorization": `Bearer ${token}`
+        }
+    });
+
+    if (!res.ok) {
+        alert("Unauthorized");
+        return;
+    }
+
+    const users = await res.json();
+
+    const table = document.getElementById("users-table");
+
+    table.innerHTML = "";
+
+    users.forEach(user => {
+        table.innerHTML += `
+            <tr>
+                <td>${user.username}</td>
+                <td>${user.email}</td>
+                <td>${user.role}</td>
+
+                <td>
+                    <button onclick="lockUser('${user.username}')">
+                        Lock
+                    </button>
+
+                    <button onclick="unlockUser('${user.username}')">
+                        Unlock
+                    </button>
+
+                    <button onclick="changeRole('${user.username}', 'admin')">
+                        Make Admin
+                    </button>
+
+                    <button onclick="changeRole('${user.username}', 'user')">
+                        Make User
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+}
+
+async function lockUser(username) {
+    const token = getAccessToken();
+
+    const res = await fetch(`/admin/${username}/lock`, {
+        method: "POST",
+        headers: {
+            "Authorization": `Bearer ${token}`
+        }
+    });
+
+    const data = await res.json();
+
+    alert(data.message || data.detail);
+
+    loadUsers();
+}
+
+async function unlockUser(username) {
+    const token = getAccessToken();
+
+    const res = await fetch(`/admin/${username}/unlock`, {
+        method: "POST",
+        headers: {
+            "Authorization": `Bearer ${token}`
+        }
+    });
+
+    const data = await res.json();
+
+    alert(data.message || data.detail);
+
+    loadUsers();
+}
+
+async function changeRole(username, role) {
+    const token = getAccessToken();
+
+    const res = await fetch(
+        `/admin/${username}/role?role=${role}`,
+        {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${token}`
+            }
+        }
+    );
+
+    const data = await res.json();
+
+    alert(data.message || data.detail);
+
+    loadUsers();
+}
+

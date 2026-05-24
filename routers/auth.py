@@ -1,7 +1,8 @@
 from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException, Query, APIRouter, Depends, Request
 from typing import Annotated
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, Field, field_validator
+import re
 from sqlalchemy.orm import Session
 from starlette import status
 from database import SessionLocal
@@ -40,12 +41,94 @@ db_dependency = Annotated[Session, Depends(get_db)]
 # Pydantics Classes
 
 class CreateUserRequest(BaseModel):
-    username : str
-    email : str
-    first_name : str
-    last_name : str
-    password : str
-    role : str
+    username: str = Field(min_length=3, max_length=20)
+    email: EmailStr
+    first_name: str = Field(min_length=2, max_length=30)
+    last_name: str = Field(min_length=2, max_length=30)
+    password: str = Field(min_length=8, max_length=64)
+
+    # Username Validation
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, value):
+
+        value = value.strip().lower()
+
+        if not re.match(r"^[a-zA-Z0-9_]+$", value):
+            raise ValueError(
+                "Username can only contain letters, numbers, and underscores."
+            )
+
+        return value
+
+    # Password Validation
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, value):
+
+        if not re.search(r"[A-Z]", value):
+            raise ValueError(
+                "Password must contain at least one uppercase letter."
+            )
+
+        if not re.search(r"[a-z]", value):
+            raise ValueError(
+                "Password must contain at least one lowercase letter."
+            )
+
+        if not re.search(r"[0-9]", value):
+            raise ValueError(
+                "Password must contain at least one number."
+            )
+
+        if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", value):
+            raise ValueError(
+                "Password must contain at least one special character."
+            )
+
+        return value
+
+    # Email Normalization
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value):
+        return value.strip().lower()
+
+    # Name Cleanup
+    @field_validator("first_name", "last_name")
+    @classmethod
+    def clean_names(cls, value):
+        return value.strip()
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(min_length=8, max_length=64)
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_password(cls, value):
+
+        if not re.search(r"[A-Z]", value):
+            raise ValueError(
+                "Password must contain at least one uppercase letter."
+            )
+
+        if not re.search(r"[a-z]", value):
+            raise ValueError(
+                "Password must contain at least one lowercase letter."
+            )
+
+        if not re.search(r"[0-9]", value):
+            raise ValueError(
+                "Password must contain at least one number."
+            )
+
+        if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", value):
+            raise ValueError(
+                "Password must contain at least one special character."
+            )
+
+        return value
 
 class RefreshRequest(BaseModel):
     refresh_token : str
@@ -60,10 +143,16 @@ class LogOutRequest(BaseModel):
 
 # Helper Functions
 
-def check_user(username : str, db):
-    user = db.query(Users).filter(Users.username == username).first()
+def check_user(username: str, db):
+
+    normalized_username = username.lower().strip()
+
+    user = db.query(Users).filter(
+        Users.username == normalized_username
+    ).first()
+
     if not user:
-        return False
+        return None
 
     return user
 
@@ -104,13 +193,37 @@ def check_rate_limit(ip: str, limit: int, window: timedelta):
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
 async def create_user(create_user_request : CreateUserRequest, db: db_dependency):
+    # Normalize inputs
+    normalized_email = create_user_request.email.lower().strip()
+    normalized_username = create_user_request.username.lower().strip()
+
+    # Check existing email
+    existing_email = db.query(Users).filter(
+        Users.email == normalized_email
+    ).first()
+
+    if existing_email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered."
+        )
+
+    # Check existing username
+    existing_username = db.query(Users).filter(
+        Users.username == normalized_username
+    ).first()
+
+    if existing_username:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username already taken."
+        )
     create_user_model = Users(
-        email  = create_user_request.email,
-        username = create_user_request.username,
-        first_name = create_user_request.first_name,
-        last_name = create_user_request.last_name,
-        role=create_user_request.role,
-        hashed_password= bcrypt_context.hash(create_user_request.password),
+        email=normalized_email,
+        username=normalized_username,
+        first_name=create_user_request.first_name,
+        last_name=create_user_request.last_name,
+        hashed_password=bcrypt_context.hash(create_user_request.password),
     )
 
     db.add(create_user_model)
@@ -138,7 +251,7 @@ async def create_user(create_user_request : CreateUserRequest, db: db_dependency
     frontend_url = os.getenv("FRONTEND_URL")
 
     verification_link = (
-        f"{frontend_url}/auth/verify-email"
+        f"{frontend_url}/verify-email"
         f"?token={email_verification_token}"
     )
     try:
@@ -160,7 +273,8 @@ async def login_for_access_token(request : Request, form_data : Annotated[OAuth2
     if not check_rate_limit(ip, 5, timedelta(minutes=1)):
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many login attempts. Try again later.")
 
-    user = check_user(form_data.username, db)
+    normalized_username = form_data.username.lower().strip()
+    user = check_user(normalized_username, db)
 
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
@@ -388,7 +502,7 @@ async def request_password_reset(email : str, db :db_dependency):
     frontend_url = os.getenv("FRONTEND_URL")
 
     reset_link = (
-        f"{frontend_url}/auth/reset-password"
+        f"{frontend_url}/reset-password"
         f"?token={reset_token}"
     )
     try:
@@ -406,10 +520,10 @@ async def request_password_reset(email : str, db :db_dependency):
 
 
 @router.post("/reset-password")
-async def reset_password(token : str, db: db_dependency, new_password : str = Query(min_length = 8)):
+async def reset_password(request: ResetPasswordRequest, db: db_dependency):
     # Decode Token
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(request.token, SECRET_KEY, algorithms=[ALGORITHM])
     except JWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
 
@@ -425,7 +539,7 @@ async def reset_password(token : str, db: db_dependency, new_password : str = Qu
     valid_token = None
 
     for t in tokens:
-        if bcrypt_context.verify(token, t.hashed_token):
+        if bcrypt_context.verify(request.token, t.hashed_token):
             valid_token = t
             break
 
@@ -440,7 +554,7 @@ async def reset_password(token : str, db: db_dependency, new_password : str = Qu
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
     # hash new password
-    hashed_new_password = bcrypt_context.hash(new_password)
+    hashed_new_password = bcrypt_context.hash(request.new_password)
     # update password
     user.hashed_password = hashed_new_password
 
@@ -463,7 +577,10 @@ async def reset_password(token : str, db: db_dependency, new_password : str = Qu
 @router.get("/me")
 async def get_me(current_user : Annotated[Users, Depends(get_current_user)]):
     return {
-        "id" : current_user.id,
-        "username" : current_user.username,
-        "email" : current_user.email
+        "id": current_user.id,
+        "username": current_user.username,
+        "email": current_user.email,
+        "first_name": current_user.first_name,
+        "last_name": current_user.last_name,
+        "role": current_user.role
     }
