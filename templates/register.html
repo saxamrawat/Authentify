@@ -1,21 +1,29 @@
-<link rel="stylesheet" href="/static/style.css">
+{% extends "base.html" %}
 
-<script src="/static/app.js"></script>
+{% block title %}
+Register
+{% endblock %}
 
-<div class="container">
-    <h2>Register</h2>
+{% block content %}
 
-    <input id="username" placeholder="Username">
-    <input id="email" placeholder="Email">
-    <input id="first_name" placeholder="First Name">
-    <input id="last_name" placeholder="Last Name">
-    <input id="password" type="password" placeholder="Password">
+<div class="card">
 
-    <button onclick="register()">Register</button>
+    <h2>Create Account</h2>
 
-    <p><a href="/">Login</a></p>
+    <input type="text" id="username" placeholder="Username">
 
-    <script>
-        redirectIfLoggedIn();
-    </script>
+    <input type="email" id="email" placeholder="Email">
+
+    <input type="text" id="first_name" placeholder="First Name">
+
+    <input type="text" id="last_name" placeholder="Last Name">
+
+    <input type="password" id="password" placeholder="Password">
+
+    <button onclick="register()">
+        Register
+    </button>
+
 </div>
+
+{% endblock %}

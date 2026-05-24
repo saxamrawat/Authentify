@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block title %}
+Admin Panel
+{% endblock %}
+
+{% block content %}
+
+<div class="dashboard-card" style="max-width: 1200px;">
+
+    <h1>Admin Panel</h1>
+
+    <table>
+
+        <thead>
+            <tr>
+                <th>Username</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Verified</th>
+                <th>Locked</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+
+        <tbody id="users-table">
+
+        </tbody>
+
+    </table>
+
+</div>
+
+{% endblock %}

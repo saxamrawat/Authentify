@@ -1,18 +1,59 @@
-<link rel="stylesheet" href="/static/style.css">
+<!DOCTYPE html>
+<html lang="en">
 
-<script src="/static/app.js"></script>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<div class="container">
-    <h2>Login</h2>
+    <title>Login | Authentify</title>
 
-    <input id="username" placeholder="Username">
-    <input id="password" type="password" placeholder="Password">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
 
-    <button onclick="login()">Login</button>
+<body>
+    <nav class="navbar">
 
-    <p><a href="/register">Register</a></p>
+        <div class="logo">
+            <a href="/" class="unstyled-link">Auth<span>entify</span></a>
+        </div>
+
+    </nav>
+
+    <div class="page-container">
+
+        <div class="card">
+
+            <h2>Welcome Back</h2>
+
+            <input type="text" id="username" placeholder="Username">
+
+            <input type="password" id="password" placeholder="Password">
+
+            <button onclick="login()">
+                Login
+            </button>
+
+            <p style="margin-top: 20px; text-align: center;">
+                Don't have an account?
+                <a href="/register">Register</a>
+            </p>
+
+            <p style="text-align: center;">
+                <a href="/forgot-password">
+                    Forgot Password?
+                </a>
+            </p>
+
+        </div>
+
+    </div>
+
+    <script src="/static/app.js"></script>
 
     <script>
         redirectIfLoggedIn();
     </script>
-</div>
+
+</body>
+
+</html>

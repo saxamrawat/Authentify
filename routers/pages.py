@@ -33,3 +33,31 @@ async def dashboard_page(request: Request):
             "request": request,
         }
     )
+
+@router.get("/forgot-password")
+async def forgot_password_page(request: Request):
+    return templates.TemplateResponse(
+        "forgot_password.html",
+        {"request": request}
+    )
+
+@router.get("/reset-password")
+async def reset_password_page(request: Request):
+    return templates.TemplateResponse(
+        "reset_password.html",
+        {"request": request}
+    )
+
+@router.get("/verify-email")
+async def verify_email_page(request: Request):
+    return templates.TemplateResponse(
+        "verify_email.html",
+        {"request": request}
+    )
+
+@router.get("/admin")
+async def admin_page(request: Request):
+    return templates.TemplateResponse(
+        "admin.html",
+        {"request": request}
+    )
