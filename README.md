@@ -363,8 +363,12 @@ This is not just an authentication project — it is a progressive exploration o
 
 # 🔗 Deployment
 
-- The backend and database are deployed on a DigitalOcean Droplet.
-- A custom domain is configured for the service.
+- The authentication system is deployed on a DigitalOcean Droplet.
+- Production deployment includes:
+  - Nginx reverse proxy
+  - Uvicorn + Gunicorn application server setup
+  - HTTPS/SSL configuration
+  - Custom domain integration
 
 **Live URL:**  
 https://auth.saxam.dev
