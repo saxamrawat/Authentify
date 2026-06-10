@@ -211,12 +211,16 @@ async function resetPassword() {
     const new_password =
         document.getElementById("new_password").value;
 
-    const res = await fetch(
-        `/auth/reset-password?token=${token}&new_password=${new_password}`,
-        {
-            method: "POST"
-        }
-    );
+    const res = await fetch("/auth/reset-password", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            token,
+            new_password
+        })
+    });
 
     const data = await res.json();
 

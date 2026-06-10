@@ -1,0 +1,37 @@
+from sqlalchemy.orm import Session
+from models import RefreshToken
+
+class RefreshTokenRepository:
+
+    @staticmethod
+    def create(db : Session, refresh_token_model : RefreshToken):
+        db.add(refresh_token_model)
+
+        return refresh_token_model
+
+
+    @staticmethod
+    def get_user_tokens(db: Session,user_id: int):
+        return(
+            db.query(RefreshToken).filter(RefreshToken.user_id == user_id).all()
+        )
+
+    @staticmethod
+    def get_active_tokens(db: Session, user_id: int):
+        return (
+            db.query(RefreshToken).filter(RefreshToken.user_id == user_id).filter(RefreshToken.is_revoked == False).all()
+        )
+
+    @staticmethod
+    def revoke_token(db: Session,token: RefreshToken):
+        token.is_revoked = True
+
+
+    @staticmethod
+    def revoke_all_tokens(db: Session,user_id: int):
+        db.query(RefreshToken).filter(RefreshToken.user_id == user_id).update({"is_revoked" : True})
+
+
+    @staticmethod
+    def delete_all_tokens(db: Session,user_id: int):
+        db.query(RefreshToken).filter(RefreshToken.user_id == user_id).delete()
