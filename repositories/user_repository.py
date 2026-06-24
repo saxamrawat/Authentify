@@ -4,6 +4,11 @@ from models import Users
 class UserRepository:
 
     @staticmethod
+    def get_all_users(db: Session):
+        users = db.query(Users).all()
+        return users
+
+    @staticmethod
     def get_by_username(db: Session, username: str):
         return (
             db.query(Users).filter(Users.username == username).first()
