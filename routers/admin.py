@@ -3,7 +3,11 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from database import SessionLocal
 from models import Users
-from dependencies.permissions import get_current_user, require_admin
+
+# Dependencies
+from dependencies.database import db_dependency
+from dependencies.auth import get_current_user
+from dependencies.permissions import require_admin
 
 # Services
 from services.admin_service import AdminService

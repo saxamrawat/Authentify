@@ -5,6 +5,7 @@ from starlette import status
 from fastapi.security import OAuth2PasswordRequestForm
 from database import SessionLocal
 
+
 from schemas.auth import (
     CreateUserRequest,
     ResetPasswordRequest,
@@ -15,7 +16,8 @@ from schemas.auth import (
 
 from models import Users
 
-from dependencies.permissions import get_current_user
+from dependencies.database import db_dependency
+from dependencies.auth import get_current_user
 
 from services.auth_service import AuthService
 
@@ -23,17 +25,6 @@ router = APIRouter(
     prefix="/auth",
     tags=["auth"]
 )
-
-# DB dependency function
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-db_dependency = Annotated[Session, Depends(get_db)]
-
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
 async def create_user(
