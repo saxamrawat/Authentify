@@ -9,6 +9,7 @@ from jose import jwt, JWTError
 #Services
 from services.token_service import TokenService
 from services.session_service import SessionService
+from services.email_service import EmailService
 
 # Repositories
 from repositories.user_repository import UserRepository
@@ -23,7 +24,6 @@ from schemas.auth import CreateUserRequest, ResetPasswordRequest, RefreshRequest
 from models import Users, EmailVerification, PasswordReset
 
 #Utils
-from utils.email_utils import send_verification_email, send_password_reset_email
 from utils.rate_limiter import check_rate_limit
 
 #Core
@@ -98,7 +98,7 @@ class AuthService:
             f"?token={email_verification_token}"
         )
         try:
-            send_verification_email(
+            EmailService.send_verification_email(
                 create_user_model.email,
                 verification_link
             )
@@ -349,7 +349,7 @@ class AuthService:
             f"?token={reset_token}"
         )
         try:
-            send_password_reset_email(
+            EmailService.send_password_reset_email(
                 user.email,
                 reset_link
             )
@@ -409,7 +409,7 @@ class AuthService:
         PasswordResetRepository.delete_user_tokens(db, user_id)
 
         # invalidate sessions
-        RefreshTokenRepository.delete_all_tokens(db, user_id)
+        SessionService.revoke_all_sessions(db, user_id)
         # reset user state
         user.failed_attempts = 0
         user.locked_until = None
