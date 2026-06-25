@@ -1,11 +1,19 @@
+# Auth API Routers
+
+# Libraries
+
 from fastapi import APIRouter, Depends, Request
 from typing import Annotated
-from sqlalchemy.orm import Session
 from starlette import status
 from fastapi.security import OAuth2PasswordRequestForm
 from database import SessionLocal
+from models import Users
 
+# Dependencies
+from dependencies.database import db_dependency
+from dependencies.auth import get_current_user
 
+# Schemas
 from schemas.auth import (
     CreateUserRequest,
     ResetPasswordRequest,
@@ -14,12 +22,9 @@ from schemas.auth import (
     LogOutRequest
 )
 
-from models import Users
-
-from dependencies.database import db_dependency
-from dependencies.auth import get_current_user
-
+# Services
 from services.auth_service import AuthService
+
 
 router = APIRouter(
     prefix="/auth",

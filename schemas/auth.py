@@ -1,3 +1,7 @@
+# Auth Schema
+
+# Libraries
+
 from pydantic import BaseModel, EmailStr, Field, field_validator
 import re
 

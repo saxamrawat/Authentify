@@ -1,15 +1,15 @@
+# Main
+
+# Libraries
+
 from fastapi import FastAPI
-from routers import auth, pages, admin
-import models
-from database import engine
+from api import auth, pages, admin
 from fastapi.staticfiles import StaticFiles
 
 app = FastAPI()
 
 # Mount Static Files
 app.mount("/static", StaticFiles(directory="static"), name="static")
-
-# models.Base.metadata.create_all(bind=engine)
 
 app.include_router(auth.router)
 app.include_router(admin.router)

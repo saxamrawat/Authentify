@@ -1,6 +1,8 @@
+# Auth Service
+
+# Libraries
+
 from datetime import datetime, timedelta, timezone
-from fastapi import HTTPException
-from starlette import status
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 from fastapi.security import OAuth2PasswordRequestForm
@@ -36,7 +38,20 @@ from core.security import(
     ACCESS_TOKEN_EXPIRE_MINUTES,
     REFRESH_TOKEN_EXPIRE_DAYS
 )
-
+from core.exceptions import (
+    InvalidCredentialsException,
+    UserLockedException,
+    UserNotFoundException,
+    InvalidTokenException,
+    InvalidTokenTypeException,
+    EmailAlreadyRegisteredException,
+    UsernameAlreadyTakenException,
+    EmailDeliveryFailedException,
+    TooManyLoginAttemptsException,
+    RefreshTokenExpiredException,
+    RefreshTokenNotRecognizedException,
+    SessionSecurityViolationException
+)
 
 # Authentication and Hashed Password Dependencies
 bcrypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -53,13 +68,13 @@ class AuthService:
         existing_email = UserRepository.get_by_email(db, normalized_email)
 
         if existing_email:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered.")
+            raise EmailAlreadyRegisteredException()
 
         # Check existing username
         existing_username = UserRepository.get_by_username(db, normalized_username)
 
         if existing_username:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already taken.")
+            raise UsernameAlreadyTakenException()
 
         create_user_model = Users(
             email=normalized_email,
@@ -104,17 +119,13 @@ class AuthService:
             )
         except Exception as e:
             print(e)
-            raise HTTPException(
-                status_code=500,
-                detail="Failed to send verification email"
-            )
+            raise EmailDeliveryFailedException()
 
     @staticmethod
     def login(db : Session, form_data: OAuth2PasswordRequestForm, ip : str):
 
         if not check_rate_limit(ip, 5, timedelta(minutes=1)):
-            raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                                detail="Too many login attempts. Try again later.")
+            raise TooManyLoginAttemptsException()
 
         normalized_username = form_data.username.lower().strip()
 
@@ -122,15 +133,15 @@ class AuthService:
         user = UserRepository.get_by_username(db, normalized_username)
 
         if not user:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+            raise InvalidCredentialsException()
 
         # Verified or not
         if not user.is_verified:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+            raise InvalidCredentialsException()
 
         # Check is_locked/locked_until
         if user.locked_until and user.locked_until > datetime.now(timezone.utc):
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User temporarily locked.")
+            raise UserLockedException()
         else:
             user.locked_until = None
 
@@ -142,7 +153,7 @@ class AuthService:
                 SessionService.revoke_all_sessions(db, user.id)
             db.add(user)
             db.commit()
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+            raise InvalidCredentialsException()
         user.failed_attempts = 0
         db.add(user)
         db.commit()
@@ -175,16 +186,16 @@ class AuthService:
         try:
             payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
         except JWTError:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="-Invalid refresh token")
+            raise RefreshTokenNotRecognizedException()
 
         # Validate Token type
         if payload.get("token_type") != "refresh":
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token type")
+            raise InvalidTokenTypeException()
 
         user_id = payload.get("sub")
 
         if user_id is None:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+            raise RefreshTokenNotRecognizedException()
 
         user_id = int(user_id)
 
@@ -199,16 +210,16 @@ class AuthService:
         )
 
         if not valid_session:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh Token not recognized")
+            raise RefreshTokenNotRecognizedException()
 
         # Check Expiry
         if valid_session.expires_at < datetime.now(timezone.utc):
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh Token Expired")
+            raise RefreshTokenExpiredException()
 
         # Reuse Detection
         if valid_session.is_revoked:
             SessionService.revoke_all_sessions(db, user_id)
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session Security Violation Detected.")
+            raise SessionSecurityViolationException()
 
         # Revoking old refresh token
         valid_session.is_revoked = True
@@ -217,7 +228,7 @@ class AuthService:
         # Generate New Access Token
         user = UserRepository.get_by_id(db, valid_session.user_id)
         if not user:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+            raise UserNotFoundException()
 
         new_access_token = TokenService.create_access_token(
             username=user.username,
@@ -251,16 +262,16 @@ class AuthService:
         try:
             payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
         except JWTError:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+            raise RefreshTokenNotRecognizedException()
 
         # Validate Token type
         if payload.get("token_type") != "refresh":
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token type")
+            raise InvalidTokenTypeException()
 
         user_id = payload.get("sub")
 
         if user_id is None:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+            raise InvalidTokenException()
 
         user_id = int(user_id)
 
@@ -279,11 +290,11 @@ class AuthService:
         try:
             payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         except JWTError:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+            raise InvalidTokenException()
 
         # Check token type
         if payload.get("token_type") != "email_verification":
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+            raise InvalidTokenException()
 
         user_id = payload.get("sub")
 
@@ -298,16 +309,16 @@ class AuthService:
                 break
 
         if not valid_token:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+            raise InvalidTokenException()
 
         # Check expiry
         if valid_token.expires_at < datetime.now(timezone.utc):
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+            raise InvalidTokenException()
 
         # Get user
         user = UserRepository.get_by_id(db, user_id)
         if not user:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+            raise InvalidTokenException()
 
         # Mark verified
         user.is_verified = True
@@ -354,10 +365,7 @@ class AuthService:
                 reset_link
             )
         except Exception:
-            raise HTTPException(
-                status_code=500,
-                detail="Failed to send password reset email"
-            )
+            raise EmailDeliveryFailedException()
 
         return {"message": "If the account exists, a reset link has been sent."}
 
@@ -367,18 +375,18 @@ class AuthService:
         try:
             payload = jwt.decode(reset_request.token, SECRET_KEY, algorithms=[ALGORITHM])
         except JWTError:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+            raise InvalidTokenException()
 
         # Validate Token Type
 
         if not payload.get("token_type") == "password_reset":
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+            raise InvalidTokenException()
 
         # find matching DB token
         user_id = payload.get("sub")
 
         if user_id is None:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+            raise InvalidTokenException()
 
         user_id = int(user_id)
 
@@ -391,15 +399,15 @@ class AuthService:
                 break
 
         if not valid_token:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+            raise InvalidTokenException()
 
         # check expiry
         if valid_token.expires_at < datetime.now(timezone.utc):
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+            raise InvalidTokenException()
         # find user
         user = UserRepository.get_by_id(db, user_id)
         if not user:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+            raise InvalidTokenException()
         # hash new password
         hashed_new_password = bcrypt_context.hash(reset_request.new_password)
         # update password

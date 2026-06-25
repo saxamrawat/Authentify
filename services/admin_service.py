@@ -1,13 +1,20 @@
+# Admin Service
+
+# Libraries
+
 from datetime import datetime, timedelta, timezone
-from fastapi import HTTPException
-from starlette import status
 from sqlalchemy.orm import Session
+from models import Users
 
 # Repositories
 from repositories.user_repository import UserRepository
 
-# Models
-from models import Users
+# Core
+from core.exceptions import (
+    UserNotFoundException,
+    InvalidUserRoleException,
+    SelfRoleChangeNotAllowedException
+)
 
 
 class AdminService:
@@ -22,7 +29,7 @@ class AdminService:
         user = UserRepository.get_by_username(db, username)
 
         if not user:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+            raise UserNotFoundException()
 
         user.locked_until = datetime.now(timezone.utc) + timedelta(days=3)
         db.commit()
@@ -35,7 +42,7 @@ class AdminService:
         user = UserRepository.get_by_username(db, username)
 
         if not user:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+            raise UserNotFoundException()
 
         user.failed_attempts = 0
         user.locked_until = None
@@ -49,13 +56,13 @@ class AdminService:
         user = UserRepository.get_by_username(db, username)
 
         if not user:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+            raise UserNotFoundException()
 
         if role not in ["admin", "user"]:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Wrong user role provided.")
+            raise InvalidUserRoleException()
 
         if user.username == admin_user.username:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Can't Self Demote.")
+            raise SelfRoleChangeNotAllowedException()
 
         user.role = role
         db.commit()

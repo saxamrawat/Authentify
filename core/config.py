@@ -1,4 +1,6 @@
-# app/core/config.py
+# Core Configs
+
+# Libraries
 
 import os
 from dotenv import load_dotenv

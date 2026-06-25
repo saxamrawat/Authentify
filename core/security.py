@@ -1,3 +1,7 @@
+# Core Security
+
+# Libraries
+
 import os
 from dotenv import load_dotenv
 

@@ -1,3 +1,7 @@
+# Permission Dependencies
+
+# Libraries
+
 from typing import Annotated
 from fastapi import Depends, HTTPException
 from starlette import status

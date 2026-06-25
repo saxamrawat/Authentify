@@ -1,4 +1,9 @@
+# Email Service
+
+# Libraries
+
 import resend
+
 #Core
 from core.config import(
     RESEND_API_KEY,

@@ -1,3 +1,7 @@
+# Email Verification Repository
+
+# Libraries
+
 from sqlalchemy.orm import Session
 from models import EmailVerification
 

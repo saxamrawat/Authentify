@@ -1,4 +1,4 @@
-# utils/rate_limiter.py
+# Rate Limiter Utility
 
 from datetime import datetime, timezone, timedelta
 

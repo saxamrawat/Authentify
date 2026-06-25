@@ -1,9 +1,16 @@
+# Session Service
+
+# Libraries
+
 from datetime import datetime, timezone, timedelta
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
-
 from models import RefreshToken
+
+# Repositories
 from repositories.refresh_token_repository import RefreshTokenRepository
+
+# Core
 from core.security import REFRESH_TOKEN_EXPIRE_DAYS
 
 bcrypt_context = CryptContext(
