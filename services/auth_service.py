@@ -23,7 +23,7 @@ from repositories.password_reset_repository import PasswordResetRepository
 from schemas.auth import CreateUserRequest, ResetPasswordRequest, RefreshRequest,Token, LogOutRequest
 
 #Models
-from models import Users, EmailVerification, PasswordReset
+from models.models import Users, EmailVerification, PasswordReset
 
 #Utils
 from utils.rate_limiter import check_rate_limit

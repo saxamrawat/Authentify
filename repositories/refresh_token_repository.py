@@ -3,7 +3,7 @@
 # Libraries
 
 from sqlalchemy.orm import Session
-from models import RefreshToken
+from models.models import RefreshToken
 
 class RefreshTokenRepository:
 

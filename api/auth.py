@@ -7,7 +7,7 @@ from typing import Annotated
 from starlette import status
 from fastapi.security import OAuth2PasswordRequestForm
 from database import SessionLocal
-from models import Users
+from models.models import Users
 
 # Dependencies
 from dependencies.database import db_dependency

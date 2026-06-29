@@ -3,7 +3,7 @@
 # Libraries
 
 from sqlalchemy.orm import Session
-from models import PasswordReset
+from models.models import PasswordReset
 
 class PasswordResetRepository:
 

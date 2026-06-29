@@ -5,7 +5,7 @@
 from datetime import datetime, timezone, timedelta
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
-from models import RefreshToken
+from models.models import RefreshToken
 
 # Repositories
 from repositories.refresh_token_repository import RefreshTokenRepository

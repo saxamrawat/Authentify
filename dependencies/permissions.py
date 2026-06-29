@@ -7,7 +7,7 @@ from fastapi import Depends, HTTPException
 from starlette import status
 from database import SessionLocal
 from dependencies.auth import get_current_user
-from models import Users
+from models.models import Users
 
 # Admin Authorization Dependency
 async def require_admin(current_user: Annotated[Users, Depends(get_current_user)]):

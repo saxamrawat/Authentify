@@ -4,7 +4,7 @@
 
 from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
-from models import Users
+from models.models import Users
 
 # Repositories
 from repositories.user_repository import UserRepository

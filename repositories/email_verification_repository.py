@@ -3,7 +3,7 @@
 # Libraries
 
 from sqlalchemy.orm import Session
-from models import EmailVerification
+from models.models import EmailVerification
 
 class EmailVerificationRepository:
 
