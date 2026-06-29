@@ -1,90 +1,128 @@
-# Session Service
+from uuid import UUID
 
-# Libraries
-
-from datetime import datetime, timezone, timedelta
 from sqlalchemy.orm import Session
-from passlib.context import CryptContext
-from models.models import RefreshToken
 
-# Repositories
-from repositories.refresh_token_repository import RefreshTokenRepository
+from models.models import UserSession
+from repositories.session_repository import SessionRepository
 
-# Core
-from core.security import REFRESH_TOKEN_EXPIRE_DAYS
-
-bcrypt_context = CryptContext(
-    schemes=["bcrypt"],
-    deprecated="auto"
+from core.exceptions import (
+    SessionNotFoundException,
+    SessionAccessDeniedException
 )
 
 
 class SessionService:
 
     @staticmethod
-    def create_session(db: Session, user_id: int, refresh_token: str):
-        hashed_refresh = bcrypt_context.hash(
-            refresh_token
-        )
+    def create_session(
+        db: Session,
+        user_id: int,
+        device_name: str | None,
+        ip_address: str | None,
+        user_agent: str | None,
+    ) -> UserSession:
 
-        refresh_token_model = RefreshToken(
+        return SessionRepository.create(
+            db=db,
             user_id=user_id,
-            hashed_token=hashed_refresh,
-            expires_at=(
-                datetime.now(timezone.utc)
-                + timedelta(
-                    days=REFRESH_TOKEN_EXPIRE_DAYS
-                )
-            ),
-            is_revoked=False
+            device_name=device_name,
+            ip_address=ip_address,
+            user_agent=user_agent,
         )
-
-        db.add(refresh_token_model)
-        db.commit()
 
     @staticmethod
-    def get_valid_session(db: Session, user_id: int, refresh_token: str):
-        tokens = (
-            RefreshTokenRepository
-            .get_user_tokens(
-                db,
-                user_id
-            )
+    def get_session(
+        db: Session,
+        session_id: UUID,
+    ) -> UserSession | None:
+
+        return SessionRepository.get_by_id(
+            db=db,
+            session_id=session_id,
         )
-
-        for token in tokens:
-            if bcrypt_context.verify(
-                refresh_token,
-                token.hashed_token
-            ):
-                return token
-
-        return None
 
     @staticmethod
-    def revoke_session(db: Session, refresh_token: str, user_id: int):
-        tokens = (
-            RefreshTokenRepository
-            .get_user_tokens(
-                db,
-                user_id
-            )
-        )
+    def get_active_sessions(
+        db: Session,
+        user_id: int,
+    ) -> list[UserSession]:
 
-        for token in tokens:
-            if bcrypt_context.verify(
-                refresh_token,
-                token.hashed_token
-            ):
-                token.is_revoked = True
-                db.commit()
-                return
+        return SessionRepository.get_active_by_user_id(
+            db=db,
+            user_id=user_id,
+        )
 
     @staticmethod
-    def revoke_all_sessions(db: Session, user_id: int):
-        RefreshTokenRepository.revoke_all_tokens(
-            db,
-            user_id
+    def get_user_session(
+        db: Session,
+        user_id: int,
+        session_id: UUID,
+    ) -> UserSession | None:
+
+        session = SessionRepository.get_by_id(
+            db=db,
+            session_id=session_id,
         )
 
-        db.commit()
+        if not session:
+            raise SessionNotFoundException()
+
+        if session.user_id != user_id:
+            raise SessionAccessDeniedException()
+
+        return session
+
+    @staticmethod
+    def update_last_active(
+        db: Session,
+        session_id: UUID,
+    ) -> UserSession | None:
+
+        session = SessionRepository.get_by_id(
+            db=db,
+            session_id=session_id,
+        )
+
+        if not session:
+            raise SessionNotFoundException()
+
+        return SessionRepository.update_last_active(
+            db=db,
+            session_obj=session,
+        )
+
+    @staticmethod
+    def revoke_session(
+        db: Session,
+        user_id: int,
+        session_id: UUID,
+    ) -> bool:
+
+        session = SessionRepository.get_by_id(
+            db=db,
+            session_id=session_id,
+        )
+
+        if not session:
+            raise SessionNotFoundException()
+
+        if session.user_id != user_id:
+            raise SessionAccessDeniedException()
+
+        SessionRepository.revoke(
+            db=db,
+            session_obj=session,
+        )
+
+        return True
+
+    @staticmethod
+    def revoke_all_sessions(
+        db: Session,
+        user_id: int,
+    ) -> int:
+
+        return SessionRepository.revoke_all_user_sessions(
+            db=db,
+            user_id=user_id,
+        )

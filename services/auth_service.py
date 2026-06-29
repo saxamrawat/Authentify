@@ -1,5 +1,5 @@
 # Auth Service
-
+# Has some duplicate exceptions need to consolidate.
 # Libraries
 
 from datetime import datetime, timedelta, timezone
@@ -11,6 +11,7 @@ from jose import jwt, JWTError
 #Services
 from services.token_service import TokenService
 from services.session_service import SessionService
+from services.refresh_token_service import RefreshTokenService
 from services.email_service import EmailService
 
 # Repositories
@@ -150,7 +151,7 @@ class AuthService:
             user.failed_attempts += 1
             if user.failed_attempts >= 3:
                 user.locked_until = datetime.now(timezone.utc) + timedelta(days=3)
-                SessionService.revoke_all_sessions(db, user.id)
+                RefreshTokenService.revoke_all_refresh_tokens(db, user.id)
             db.add(user)
             db.commit()
             raise InvalidCredentialsException()
@@ -163,9 +164,9 @@ class AuthService:
                                            timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
         refresh_token = TokenService.create_refresh_token(user.id, timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS))
 
-        #Creating New Session
+        #Creating New Refresh Token
 
-        SessionService.create_session(
+        RefreshTokenService.create_refresh_token_record(
             db=db,
             user_id=user.id,
             refresh_token=refresh_token
@@ -199,10 +200,10 @@ class AuthService:
 
         user_id = int(user_id)
 
-        # Find Matching Session in DB
+        # Find Matching Refresh Token in DB
 
         valid_session = (
-            SessionService.get_valid_session(
+            RefreshTokenService.get_valid_refresh_token(
                 db=db,
                 user_id=user_id,
                 refresh_token=refresh_token
@@ -218,7 +219,7 @@ class AuthService:
 
         # Reuse Detection
         if valid_session.is_revoked:
-            SessionService.revoke_all_sessions(db, user_id)
+            RefreshTokenService.revoke_all_refresh_tokens(db, user_id)
             raise SessionSecurityViolationException()
 
         # Revoking old refresh token
@@ -241,8 +242,8 @@ class AuthService:
 
         new_refresh_token = TokenService.create_refresh_token(user.id, timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS))
 
-        #Creating new session
-        SessionService.create_session(
+        #Creating new Refresh Token
+        RefreshTokenService.create_refresh_token_record(
             db=db,
             user_id=user.id,
             refresh_token=new_refresh_token
@@ -275,8 +276,8 @@ class AuthService:
 
         user_id = int(user_id)
 
-        # Revoke Current Session
-        SessionService.revoke_session(
+        # Revoke Current Refresh Token
+        RefreshTokenService.revoke_refresh_token(
             db=db,
             refresh_token=refresh_token,
             user_id=user_id
@@ -416,8 +417,8 @@ class AuthService:
         # delete reset tokens
         PasswordResetRepository.delete_user_tokens(db, user_id)
 
-        # invalidate sessions
-        SessionService.revoke_all_sessions(db, user_id)
+        # invalidate Refresh Token
+        RefreshTokenService.revoke_all_refresh_tokens(db, user_id)
         # reset user state
         user.failed_attempts = 0
         user.locked_until = None

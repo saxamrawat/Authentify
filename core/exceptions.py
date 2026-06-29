@@ -138,3 +138,18 @@ class SelfRoleChangeNotAllowedException(HTTPException):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="You cannot change your own role."
         )
+
+class SessionNotFoundException(HTTPException):
+    def __init__(self):
+        super().__init__(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found."
+        )
+
+
+class SessionAccessDeniedException(HTTPException):
+    def __init__(self):
+        super().__init__(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this session."
+        )
