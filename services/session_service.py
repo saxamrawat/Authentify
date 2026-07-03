@@ -14,17 +14,12 @@ from core.exceptions import (
 class SessionService:
 
     @staticmethod
-    def create_session(
-        db: Session,
-        user_id: int,
-        device_name: str | None,
-        ip_address: str | None,
-        user_agent: str | None,
-    ) -> UserSession:
+    def create_session(db: Session, user_id: int, refresh_token_id : int, device_name: str | None, ip_address: str | None, user_agent: str | None) -> UserSession:
 
         return SessionRepository.create(
             db=db,
             user_id=user_id,
+            refresh_token_id=refresh_token_id,
             device_name=device_name,
             ip_address=ip_address,
             user_agent=user_agent,
@@ -42,10 +37,15 @@ class SessionService:
         )
 
     @staticmethod
-    def get_active_sessions(
-        db: Session,
-        user_id: int,
-    ) -> list[UserSession]:
+    def get_session_by_refresh_token(db: Session, refresh_token_id: int) -> UserSession | None:
+
+        return SessionRepository.get_by_refresh_token_id(
+            db=db,
+            refresh_token_id=refresh_token_id,
+        )
+
+    @staticmethod
+    def get_active_sessions(db: Session, user_id: int) -> list[UserSession]:
 
         return SessionRepository.get_active_by_user_id(
             db=db,
@@ -53,11 +53,7 @@ class SessionService:
         )
 
     @staticmethod
-    def get_user_session(
-        db: Session,
-        user_id: int,
-        session_id: UUID,
-    ) -> UserSession | None:
+    def get_user_session(db: Session, user_id: int, session_id: UUID) -> UserSession | None:
 
         session = SessionRepository.get_by_id(
             db=db,
@@ -73,10 +69,7 @@ class SessionService:
         return session
 
     @staticmethod
-    def update_last_active(
-        db: Session,
-        session_id: UUID,
-    ) -> UserSession | None:
+    def update_last_active(db: Session, session_id: UUID) -> UserSession | None:
 
         session = SessionRepository.get_by_id(
             db=db,
@@ -92,11 +85,7 @@ class SessionService:
         )
 
     @staticmethod
-    def revoke_session(
-        db: Session,
-        user_id: int,
-        session_id: UUID,
-    ) -> bool:
+    def revoke_session(db: Session, user_id: int, session_id: UUID) -> bool:
 
         session = SessionRepository.get_by_id(
             db=db,
@@ -117,12 +106,38 @@ class SessionService:
         return True
 
     @staticmethod
-    def revoke_all_sessions(
-        db: Session,
-        user_id: int,
-    ) -> int:
+    def revoke_all_sessions(db: Session, user_id: int) -> int:
 
         return SessionRepository.revoke_all_user_sessions(
             db=db,
             user_id=user_id,
         )
+
+    @staticmethod
+    def update_refresh_token(db: Session, session_obj: UserSession, refresh_token_id : int):
+
+        return SessionRepository.update_refresh_token(
+            db = db,
+            session_obj=session_obj,
+            refresh_token_id=refresh_token_id
+        )
+
+    @staticmethod
+    def revoke_session_by_refresh_token(db: Session, refresh_token_id: int) -> bool:
+
+        session = (
+            SessionRepository.get_by_refresh_token_id(
+                db=db,
+                refresh_token_id=refresh_token_id
+            )
+        )
+
+        if not session:
+            return False
+
+        SessionRepository.revoke(
+            db=db,
+            session_obj=session
+        )
+
+        return True

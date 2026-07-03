@@ -5,6 +5,7 @@
 from datetime import datetime, timedelta, timezone
 from jose import jwt
 from passlib.context import CryptContext
+import uuid
 
 #Core
 from core.security import(
@@ -32,14 +33,16 @@ class TokenService:
 
     @staticmethod
     def create_refresh_token(user_id: int, expire_delta: timedelta):
-        encode = {
-            "sub": str(user_id),
-            "token_type": "refresh"
-        }
         expires = datetime.now(timezone.utc) + expire_delta
-        encode.update({"exp": expires})
 
-        return jwt.encode(encode, SECRET_KEY, ALGORITHM)
+        payload = {
+            "sub": str(user_id),
+            "token_type": "refresh",
+            "jti": str(uuid.uuid4()),
+            "exp": expires
+        }
+
+        return jwt.encode(payload, SECRET_KEY, ALGORITHM)
 
     @staticmethod
     def create_email_verification_token(user_id: int, expire_delta: timedelta):

@@ -22,7 +22,7 @@ bcrypt_context = CryptContext(
 class RefreshTokenService:
 
     @staticmethod
-    def create_refresh_token_record(db: Session, user_id: int, refresh_token: str):
+    def create_refresh_token_record(db: Session, user_id: int, refresh_token: str) -> RefreshToken:
         hashed_refresh = bcrypt_context.hash(
             refresh_token
         )
@@ -41,6 +41,9 @@ class RefreshTokenService:
 
         db.add(refresh_token_model)
         db.commit()
+        db.refresh(refresh_token_model)
+
+        return refresh_token_model
 
     @staticmethod
     def get_valid_refresh_token(db: Session, user_id: int, refresh_token: str):
@@ -62,23 +65,9 @@ class RefreshTokenService:
         return None
 
     @staticmethod
-    def revoke_refresh_token(db: Session, refresh_token: str, user_id: int):
-        tokens = (
-            RefreshTokenRepository
-            .get_user_tokens(
-                db,
-                user_id
-            )
-        )
-
-        for token in tokens:
-            if bcrypt_context.verify(
-                refresh_token,
-                token.hashed_token
-            ):
-                token.is_revoked = True
-                db.commit()
-                return
+    def revoke_refresh_token(db: Session, refresh_token_record: RefreshToken):
+        refresh_token_record.is_revoked = True
+        db.commit()
 
     @staticmethod
     def revoke_all_refresh_tokens(db: Session, user_id: int):

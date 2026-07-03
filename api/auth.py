@@ -48,12 +48,14 @@ async def login_for_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     db: db_dependency
 ):
-    ip = request.client.host
+    ip_address = request.client.host
+    user_agent = request.headers.get("user-agent")
 
     return AuthService.login(
         db=db,
         form_data=form_data,
-        ip=ip
+        ip_address=ip_address,
+        user_agent=user_agent
     )
 
 

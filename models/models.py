@@ -37,6 +37,11 @@ class RefreshToken(Base):
     hashed_token = Column(String)
     expires_at = Column(DateTime(timezone=True))
     is_revoked = Column(Boolean, default=False)
+    session = relationship(
+        "UserSession",
+        back_populates="refresh_token",
+        uselist=False
+    )
 
 #Email Verification Model
 class EmailVerification(Base):
@@ -117,5 +122,20 @@ class UserSession(Base):
     user = relationship(
         "Users",
         back_populates="sessions",
+    )
+
+    refresh_token_id = Column(
+        Integer,
+        ForeignKey(
+            "refresh_tokens.id",
+            ondelete="CASCADE"
+        ),
+        nullable=False,
+        unique=True,
+    )
+
+    refresh_token = relationship(
+        "RefreshToken",
+        back_populates="session"
     )
 

@@ -123,9 +123,11 @@ class AuthService:
             raise EmailDeliveryFailedException()
 
     @staticmethod
-    def login(db : Session, form_data: OAuth2PasswordRequestForm, ip : str):
+    def login(db : Session, form_data: OAuth2PasswordRequestForm, ip_address : str, user_agent : str | None):
 
-        if not check_rate_limit(ip, 5, timedelta(minutes=1)):
+        device_name = user_agent
+
+        if not check_rate_limit(ip_address, 5, timedelta(minutes=1)):
             raise TooManyLoginAttemptsException()
 
         normalized_username = form_data.username.lower().strip()
@@ -164,12 +166,23 @@ class AuthService:
                                            timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
         refresh_token = TokenService.create_refresh_token(user.id, timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS))
 
-        #Creating New Refresh Token
+        # Creating New Refresh Token
 
-        RefreshTokenService.create_refresh_token_record(
+        refresh_token_record = RefreshTokenService.create_refresh_token_record(
             db=db,
             user_id=user.id,
             refresh_token=refresh_token
+        )
+
+        # Creating Device Session
+
+        SessionService.create_session(
+            db=db,
+            user_id=user.id,
+            refresh_token_id=refresh_token_record.id,
+            device_name=device_name,
+            ip_address=ip_address,
+            user_agent=user_agent,
         )
 
         # Returning the Token Model
@@ -182,7 +195,6 @@ class AuthService:
     @staticmethod
     def refresh_access_token(db: Session, refresh_request : RefreshRequest):
         refresh_token = refresh_request.refresh_token
-
         # Decode JWT
         try:
             payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -202,7 +214,7 @@ class AuthService:
 
         # Find Matching Refresh Token in DB
 
-        valid_session = (
+        refresh_token_record = (
             RefreshTokenService.get_valid_refresh_token(
                 db=db,
                 user_id=user_id,
@@ -210,24 +222,39 @@ class AuthService:
             )
         )
 
-        if not valid_session:
+        if not refresh_token_record:
             raise RefreshTokenNotRecognizedException()
 
         # Check Expiry
-        if valid_session.expires_at < datetime.now(timezone.utc):
+        if refresh_token_record.expires_at < datetime.now(timezone.utc):
             raise RefreshTokenExpiredException()
 
         # Reuse Detection
-        if valid_session.is_revoked:
+        if refresh_token_record.is_revoked:
             RefreshTokenService.revoke_all_refresh_tokens(db, user_id)
+            SessionService.revoke_all_sessions(db, user_id)
             raise SessionSecurityViolationException()
 
+        user_session = (
+            SessionService.get_session_by_refresh_token(
+                db=db,
+                refresh_token_id=refresh_token_record.id
+            )
+        )
+
+        if not user_session:
+            raise RefreshTokenNotRecognizedException()
+
+        # If User Session isn't active
+        if not user_session.is_active:
+            raise SessionSecurityViolationException()
+
+
         # Revoking old refresh token
-        valid_session.is_revoked = True
-        db.commit()
+        RefreshTokenService.revoke_refresh_token(db, refresh_token_record)
 
         # Generate New Access Token
-        user = UserRepository.get_by_id(db, valid_session.user_id)
+        user = UserRepository.get_by_id(db, refresh_token_record.user_id)
         if not user:
             raise UserNotFoundException()
 
@@ -243,10 +270,23 @@ class AuthService:
         new_refresh_token = TokenService.create_refresh_token(user.id, timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS))
 
         #Creating new Refresh Token
-        RefreshTokenService.create_refresh_token_record(
+        new_refresh_token_record = RefreshTokenService.create_refresh_token_record(
             db=db,
             user_id=user.id,
             refresh_token=new_refresh_token
+        )
+
+        # Updating Refresh Token for the session
+        SessionService.update_refresh_token(
+            db=db,
+            session_obj=user_session,
+            refresh_token_id=new_refresh_token_record.id
+        )
+
+        # Update Last Active
+        SessionService.update_last_active(
+            db=db,
+            session_id=user_session.id
         )
 
         return Token(
@@ -276,11 +316,24 @@ class AuthService:
 
         user_id = int(user_id)
 
+        # Getting the refresh token and revoking the user session
+        refresh_token_record = (
+            RefreshTokenService.get_valid_refresh_token(
+                db=db,
+                user_id=user_id,
+                refresh_token=refresh_token
+            )
+        )
+
+        SessionService.revoke_session_by_refresh_token(
+            db=db,
+            refresh_token_id=refresh_token_record.id
+        )
+
         # Revoke Current Refresh Token
         RefreshTokenService.revoke_refresh_token(
             db=db,
-            refresh_token=refresh_token,
-            user_id=user_id
+            refresh_token_record=refresh_token_record
         )
 
         return {"message": "Logout Successful"}
