@@ -18,6 +18,10 @@ from core.security import(
     ALGORITHM
 )
 
+from core.exceptions import(
+    InvalidTokenException
+)
+
 oauth2_bearer = OAuth2PasswordBearer(
     tokenUrl="auth/login"
 )
@@ -31,6 +35,12 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_bearer)], db: Se
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token type.")
         username = payload.get("sub")
         user_id = payload.get("id")
+
+        session_id = payload.get("session_id")
+
+        if session_id is None:
+            raise InvalidTokenException()
+
         if username is None or user_id is None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not authenticate user.")
         # Find user

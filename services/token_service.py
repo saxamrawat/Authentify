@@ -19,17 +19,26 @@ bcrypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 class TokenService:
 
     @staticmethod
-    def create_access_token(username: str, user_id: int, role: str, expire_delta: timedelta):
+    def create_access_token(username: str, user_id: int, role: str, session_id: str, expire_delta: timedelta):
         encode = {
             "sub": username,
             "id": user_id,
             "role": role,
+            "session_id": session_id,
             "token_type": "access"
         }
-        expires = datetime.now(timezone.utc) + expire_delta
-        encode.update({"exp": expires})
 
-        return jwt.encode(encode, SECRET_KEY, ALGORITHM)
+        expires = datetime.now(timezone.utc) + expire_delta
+
+        encode.update({
+            "exp": expires
+        })
+
+        return jwt.encode(
+            encode,
+            SECRET_KEY,
+            ALGORITHM
+        )
 
     @staticmethod
     def create_refresh_token(user_id: int, expire_delta: timedelta):

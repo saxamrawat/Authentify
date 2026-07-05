@@ -161,9 +161,9 @@ class AuthService:
         db.add(user)
         db.commit()
 
-        # Creating both access and refresh tokens
-        access_token = TokenService.create_access_token(user.username, user.id, user.role,
-                                           timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+        # Creating refresh tokens
+        # access_token = TokenService.create_access_token(user.username, user.id, user.role,
+        #                                    timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
         refresh_token = TokenService.create_refresh_token(user.id, timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS))
 
         # Creating New Refresh Token
@@ -175,14 +175,22 @@ class AuthService:
         )
 
         # Creating Device Session
-
-        SessionService.create_session(
+        session = SessionService.create_session(
             db=db,
             user_id=user.id,
             refresh_token_id=refresh_token_record.id,
             device_name=device_name,
             ip_address=ip_address,
-            user_agent=user_agent,
+            user_agent=user_agent
+        )
+
+        # Creating Access Token
+        access_token = TokenService.create_access_token(
+            username=user.username,
+            user_id=user.id,
+            role=user.role,
+            session_id=str(session.id),
+            expire_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         )
 
         # Returning the Token Model
@@ -262,6 +270,7 @@ class AuthService:
             username=user.username,
             user_id=int(user_id),
             role=user.role,
+            session_id=str(user_session.id),
             expire_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         )
 
