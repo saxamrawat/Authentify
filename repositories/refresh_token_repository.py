@@ -23,6 +23,16 @@ class RefreshTokenRepository:
         )
 
     @staticmethod
+    def get_by_id(db: Session, refresh_token_id: int):
+        return (
+            db.query(RefreshToken)
+            .filter(
+                RefreshToken.id == refresh_token_id
+            )
+            .first()
+        )
+
+    @staticmethod
     def get_active_tokens(db: Session, user_id: int):
         return (
             db.query(RefreshToken).filter(RefreshToken.user_id == user_id).filter(RefreshToken.is_revoked == False).all()

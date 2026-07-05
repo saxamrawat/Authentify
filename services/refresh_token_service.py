@@ -70,6 +70,22 @@ class RefreshTokenService:
         db.commit()
 
     @staticmethod
+    def revoke_refresh_token_by_id(db: Session, refresh_token_id: int):
+        token = (
+            RefreshTokenRepository.get_by_id(
+                db=db,
+                refresh_token_id=refresh_token_id
+            )
+        )
+
+        if not token:
+            return
+
+        RefreshTokenRepository.revoke_token(db=db, token=token)
+
+        db.commit()
+
+    @staticmethod
     def revoke_all_refresh_tokens(db: Session, user_id: int):
         RefreshTokenRepository.revoke_all_tokens(
             db,
