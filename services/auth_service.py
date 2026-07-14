@@ -162,8 +162,6 @@ class AuthService:
         db.commit()
 
         # Creating refresh tokens
-        # access_token = TokenService.create_access_token(user.username, user.id, user.role,
-        #                                    timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
         refresh_token = TokenService.create_refresh_token(user.id, timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS))
 
         # Creating New Refresh Token

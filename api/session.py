@@ -4,10 +4,12 @@
 # Libraries
 from fastapi import APIRouter, Depends
 from uuid import UUID
+from typing import Annotated
 
 # Dependencies
 from dependencies.database import db_dependency
 from dependencies.auth import get_current_user
+from dependencies.auth import get_current_session_id
 
 # Services
 from services.session_service import SessionService
@@ -16,6 +18,7 @@ from services.session_service import SessionService
 from schemas.session_schema import SessionResponse
 from schemas.session_schema import MessageResponse
 from schemas.session_schema import SessionDetailsResponse
+from schemas.session_schema import SessionDashboardResponse
 
 
 router = APIRouter(
@@ -24,10 +27,19 @@ router = APIRouter(
 )
 
 @router.get("", response_model=list[SessionResponse])
-def get_active_sessions( db: db_dependency, current_user=Depends(get_current_user)):
+def get_active_sessions( db: db_dependency, current_session_id: Annotated[UUID, Depends(get_current_session_id)], current_user=Depends(get_current_user)):
     return SessionService.get_active_sessions(
         db=db,
-        user_id=current_user.id
+        user_id=current_user.id,
+        current_session_id=current_session_id
+    )
+
+@router.get("/dashboard", response_model=SessionDashboardResponse)
+def get_session_dashboard(db: db_dependency, current_session_id: Annotated[UUID, Depends(get_current_session_id)], current_user=Depends(get_current_user)):
+    return SessionService.get_session_dashboard(
+        db=db,
+        user_id=current_user.id,
+        current_session_id=current_session_id
     )
 
 @router.get("/{session_id}", response_model=SessionDetailsResponse)

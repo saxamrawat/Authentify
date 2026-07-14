@@ -153,3 +153,10 @@ class SessionAccessDeniedException(HTTPException):
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have access to this session."
         )
+
+class SessionInvalidException(HTTPException):
+    def __init__(self):
+        super().__init__(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Session."
+        )

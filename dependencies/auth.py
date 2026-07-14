@@ -2,25 +2,37 @@
 
 # Libraries
 
-from fastapi import Depends, HTTPException
+from fastapi import Depends
 from fastapi.security import OAuth2PasswordBearer
 from datetime import datetime, timezone
-from starlette import status
 from sqlalchemy.orm import Session
 from typing import Annotated
-from dependencies.database import get_db
 from jose import JWTError, jwt
+from uuid import UUID
+
+# Dependencies
+from dependencies.database import get_db
+
+# Repositories
 from repositories.user_repository import UserRepository
 
-# JWT Config
+# Core
 from core.security import(
     SECRET_KEY,
     ALGORITHM
 )
 
 from core.exceptions import(
-    InvalidTokenException
+    InvalidTokenException,
+    InvalidTokenTypeException,
+    InvalidCredentialsException,
+    UserNotFoundException,
+    UserLockedException,
+    SessionInvalidException
 )
+
+# Services
+from services.session_service import SessionService
 
 oauth2_bearer = OAuth2PasswordBearer(
     tokenUrl="auth/login"
@@ -32,26 +44,55 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_bearer)], db: Se
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         # Validate token type
         if payload.get("token_type") != "access":
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token type.")
+            raise InvalidTokenTypeException()
+
         username = payload.get("sub")
         user_id = payload.get("id")
-
         session_id = payload.get("session_id")
 
         if session_id is None:
             raise InvalidTokenException()
 
         if username is None or user_id is None:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not authenticate user.")
+            raise InvalidCredentialsException()
+
+        # Update Last Active
+        SessionService.update_last_active(
+            db=db,
+            session_id=session_id
+        )
+
         # Find user
         user = UserRepository.get_by_id(db, user_id)
-
         if not user:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found.")
+            raise UserNotFoundException()
+
         # Check account lock
         if (user.locked_until and user.locked_until > datetime.now(timezone.utc)):
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User temporarily locked.")
+            raise UserLockedException()
         return user
 
     except JWTError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not authenticate user.")
+        raise InvalidCredentialsException()
+
+# Session Dependency
+async def get_current_session_id(token: Annotated[str, Depends(oauth2_bearer)]) -> UUID:
+    try:
+        payload = jwt.decode(
+            token,
+            SECRET_KEY,
+            algorithms=[ALGORITHM]
+        )
+
+        if payload.get("token_type") != "access":
+            raise InvalidTokenTypeException
+
+        session_id = payload.get("session_id")
+
+        if not session_id:
+            raise SessionInvalidException()
+
+        return UUID(session_id)
+
+    except JWTError:
+        raise InvalidCredentialsException()

@@ -11,6 +11,7 @@ from models.models import UserSession
 from schemas.session_schema import SessionResponse
 from schemas.session_schema import MessageResponse
 from schemas.session_schema import SessionDetailsResponse
+from schemas.session_schema import SessionDashboardResponse
 
 # Repositories
 from repositories.session_repository import SessionRepository
@@ -83,7 +84,7 @@ class SessionService:
         )
 
     @staticmethod
-    def get_active_sessions(db: Session, user_id: int) -> list[UserSession]:
+    def get_active_sessions(db: Session, user_id: int, current_session_id: UUID) -> list[SessionResponse]:
 
         sessions = SessionRepository.get_active_by_user_id(
             db=db,
@@ -99,6 +100,7 @@ class SessionService:
                 created_at=session.created_at,
                 last_active=session.last_active,
                 is_active=session.is_active,
+                current=(session.id == current_session_id)
             )
             for session in sessions
         ]
@@ -120,19 +122,54 @@ class SessionService:
         return session
 
     @staticmethod
-    def update_last_active(db: Session, session_id: UUID) -> UserSession | None:
+    def get_session_dashboard(db: Session, user_id: int, current_session_id: UUID) -> SessionDashboardResponse:
 
-        session = SessionRepository.get_by_id(
+        sessions = SessionRepository.get_active_by_user_id(
             db=db,
-            session_id=session_id,
+            user_id=user_id
         )
 
-        if not session:
-            raise SessionNotFoundException()
+        session_responses = [
+            SessionResponse(
+                session_id=session.id,
+                device_name=session.device_name,
+                ip_address=session.ip_address,
+                user_agent=session.user_agent,
+                created_at=session.created_at,
+                last_active=session.last_active,
+                is_active=session.is_active,
+                current=(session.id == current_session_id)
+            )
+            for session in sessions
+        ]
 
+        current_session = next(
+            (
+                session
+                for session in session_responses
+                if session.current
+            ),
+            None
+        )
+
+        other_sessions = [
+            session
+            for session in session_responses
+            if not session.current
+        ]
+
+        return SessionDashboardResponse(
+            total_sessions=len(session_responses),
+            active_sessions=len(session_responses),
+            current_session=current_session,
+            other_sessions=other_sessions
+        )
+
+    @staticmethod
+    def update_last_active(db: Session, session_id: UUID):
         return SessionRepository.update_last_active(
             db=db,
-            session_obj=session,
+            session_id=session_id
         )
 
     @staticmethod

@@ -15,6 +15,7 @@ class SessionResponse(BaseModel):
     created_at: datetime
     last_active: datetime
     is_active: bool
+    current: bool
 
     class Config:
         from_attributes = True
@@ -33,3 +34,9 @@ class SessionDetailsResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class SessionDashboardResponse(BaseModel):
+    total_sessions: int
+    active_sessions: int
+    current_session: SessionResponse | None
+    other_sessions: list[SessionResponse]

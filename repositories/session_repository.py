@@ -48,13 +48,17 @@ class SessionRepository:
         )
 
     @staticmethod
-    def update_last_active(db: Session, session_obj: UserSession) -> UserSession:
-        session_obj.last_active = datetime.now(timezone.utc)
+    def update_last_active(db: Session, session_id: UUID):
+        session = db.query(UserSession).filter(
+            UserSession.id == session_id
+        ).first()
 
-        db.commit()
-        db.refresh(session_obj)
+        if session:
+            session.last_active = datetime.now(timezone.utc)
+            db.commit()
+            db.refresh(session)
 
-        return session_obj
+        return session
 
     @staticmethod
     def revoke(db: Session, session_obj: UserSession) -> UserSession:
