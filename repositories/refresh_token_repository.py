@@ -1,7 +1,7 @@
 # Refresh Token Repository
 
 # Libraries
-
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from models.models import RefreshToken
 
@@ -51,3 +51,18 @@ class RefreshTokenRepository:
     @staticmethod
     def delete_all_tokens(db: Session,user_id: int):
         db.query(RefreshToken).filter(RefreshToken.user_id == user_id).delete()
+
+    @staticmethod
+    def delete_expired_tokens(db: Session) -> int:
+        count = (
+            db.query(RefreshToken)
+            .filter(
+                RefreshToken.expires_at <
+                datetime.now(timezone.utc)
+            )
+            .delete(synchronize_session=False)
+        )
+
+        db.commit()
+
+        return count

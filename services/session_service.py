@@ -12,6 +12,7 @@ from schemas.session_schema import SessionResponse
 from schemas.session_schema import MessageResponse
 from schemas.session_schema import SessionDetailsResponse
 from schemas.session_schema import SessionDashboardResponse
+from schemas.maintenance_schema import CleanupResponse
 
 # Repositories
 from repositories.session_repository import SessionRepository
@@ -124,7 +125,7 @@ class SessionService:
     @staticmethod
     def get_session_dashboard(db: Session, user_id: int, current_session_id: UUID) -> SessionDashboardResponse:
 
-        sessions = SessionRepository.get_active_by_user_id(
+        sessions = SessionRepository.get_all_by_user_id(
             db=db,
             user_id=user_id
         )
@@ -159,8 +160,11 @@ class SessionService:
         ]
 
         return SessionDashboardResponse(
-            total_sessions=len(session_responses),
-            active_sessions=len(session_responses),
+            total_sessions=len(sessions),
+            active_sessions=sum(
+                1 for session in sessions
+                if session.is_active
+            ),
             current_session=current_session,
             other_sessions=other_sessions
         )
@@ -251,3 +255,10 @@ class SessionService:
         )
 
         return True
+
+    @staticmethod
+    def cleanup_revoked_sessions(db: Session) -> int:
+
+        return SessionRepository.delete_revoked_sessions(
+            db=db
+        )

@@ -93,3 +93,10 @@ class RefreshTokenService:
         )
 
         db.commit()
+
+    @staticmethod
+    def cleanup_expired_tokens(db: Session) -> int:
+
+        return RefreshTokenRepository.delete_expired_tokens(
+            db=db
+        )

@@ -110,3 +110,14 @@ class SessionRepository:
 
         return session_obj
 
+    @staticmethod
+    def delete_revoked_sessions(db: Session) -> int:
+        count = (
+            db.query(UserSession)
+            .filter(UserSession.revoked_at.isnot(None))
+            .delete(synchronize_session=False)
+        )
+
+        db.commit()
+
+        return count

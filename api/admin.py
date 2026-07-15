@@ -13,8 +13,12 @@ from dependencies.database import db_dependency
 from dependencies.auth import get_current_user
 from dependencies.permissions import require_admin
 
+# Schema
+from schemas.maintenance_schema import CleanupResponse
+
 # Services
 from services.admin_service import AdminService
+from services.maintenance_service import MaintenanceService
 
 router = APIRouter(
     prefix="/admin",
@@ -56,4 +60,11 @@ async def change_user_role(admin_user : Annotated[Users, Depends(require_admin)]
         admin_user = admin_user,
         username = username,
         role = role
+    )
+
+@router.post("/maintenance/cleanup", response_model=CleanupResponse)
+def cleanup_system_data(db: db_dependency, admin_user: Annotated[Users, Depends(require_admin)]):
+
+    return MaintenanceService.cleanup_system_data(
+        db=db
     )
