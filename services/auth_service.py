@@ -190,6 +190,9 @@ class AuthService:
             expire_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         )
 
+        print("Session ID:", session.id)
+        print("Refresh Token Record ID:", refresh_token_record.id)
+
         # Returning the Token Model
         return Token(
             access_token = access_token,
@@ -218,14 +221,12 @@ class AuthService:
         user_id = int(user_id)
 
         # Find Matching Refresh Token in DB
-
         refresh_token_record = (
             RefreshTokenService.get_valid_refresh_token(
                 db=db,
                 refresh_token=refresh_token
             )
         )
-
         if not refresh_token_record:
             raise RefreshTokenNotRecognizedException()
 

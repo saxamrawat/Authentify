@@ -20,7 +20,8 @@ from repositories.session_repository import SessionRepository
 # Core
 from core.exceptions import (
     SessionNotFoundException,
-    SessionAccessDeniedException
+    SessionAccessDeniedException,
+    SessionInvalidException
 )
 
 # Services
@@ -119,6 +120,24 @@ class SessionService:
 
         if session.user_id != user_id:
             raise SessionAccessDeniedException()
+
+        return session
+
+    @staticmethod
+    def validate_active_session(db: Session, session_id: UUID):
+        """
+        Validate that a session exists and is still active.
+
+        Raises:
+            SessionInvalidException: If the session does not exist or has been revoked.
+        """
+        session = SessionRepository.get_by_id(
+            db=db,
+            session_id=session_id
+        )
+
+        if not session or not session.is_active:
+            raise SessionInvalidException()
 
         return session
 

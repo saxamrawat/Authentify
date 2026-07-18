@@ -331,3 +331,282 @@ async function changeRole(username, role) {
     loadUsers();
 }
 
+async function loadSessionDashboard() {
+
+    let token = getAccessToken();
+
+    let res = await fetch("/sessions/dashboard", {
+        headers: {
+            "Authorization": `Bearer ${token}`
+        }
+    });
+
+    if (res.status === 401) {
+
+        const refreshed =
+            await refreshAccessToken();
+
+        if (!refreshed) {
+            logout();
+            return;
+        }
+
+        token = getAccessToken();
+
+        res = await fetch("/sessions/dashboard", {
+            headers: {
+                "Authorization": `Bearer ${token}`
+            }
+        });
+    }
+
+    if (!res.ok) {
+        alert("Unable to load session dashboard.");
+        return;
+    }
+
+    const data = await res.json();
+
+    document.getElementById("total-sessions").innerText =
+        data.total_sessions;
+
+    document.getElementById("active-sessions").innerText =
+        data.active_sessions;
+
+    // Current Session
+    const currentSessionDiv =
+    document.getElementById("current-session");
+
+    if (data.current_session) {
+
+        currentSessionDiv.innerHTML = `
+            <p>
+                <strong>Device:</strong>
+                ${data.current_session.device_name || "Unknown Device"}
+            </p>
+
+            <p>
+                <strong>IP Address:</strong>
+                ${data.current_session.ip_address || "Unknown"}
+            </p>
+
+            <p>
+                <strong>User Agent:</strong>
+                ${data.current_session.user_agent || "Unknown"}
+            </p>
+
+            <p>
+                <strong>Created:</strong>
+                ${new Date(
+                    data.current_session.created_at
+                ).toLocaleString()}
+            </p>
+
+            <p>
+                <strong>Last Active:</strong>
+                ${new Date(
+                    data.current_session.last_active
+                ).toLocaleString()}
+            </p>
+
+            <p>
+                <strong>Status:</strong>
+                ${data.current_session.is_active
+                    ? "Active"
+                    : "Inactive"}
+            </p>
+        `;
+
+    } else {
+
+        currentSessionDiv.innerHTML =
+            "<p>No current session found.</p>";
+
+    }
+
+    // Other Sessions
+    const otherSessionsDiv =
+    document.getElementById("other-sessions");
+
+    if (
+        !data.other_sessions ||
+        data.other_sessions.length === 0
+    ) {
+
+        otherSessionsDiv.innerHTML =
+            "<p>No other sessions found.</p>";
+
+    } else {
+
+        otherSessionsDiv.innerHTML = "";
+
+        data.other_sessions.forEach(session => {
+
+            otherSessionsDiv.innerHTML += `
+                <div class="session-card">
+
+                    <p>
+                        <strong>Device:</strong>
+                        ${session.device_name || "Unknown Device"}
+                    </p>
+
+                    <p>
+                        <strong>IP:</strong>
+                        ${session.ip_address || "Unknown"}
+                    </p>
+
+                    <p>
+                        <strong>Last Active:</strong>
+                        ${new Date(
+                            session.last_active
+                        ).toLocaleString()}
+                    </p>
+
+                    <p>
+                        <strong>Status:</strong>
+                        ${
+                            session.is_active
+                                ? "Active"
+                                : "Inactive"
+                        }
+                    </p>
+
+                    <hr>
+
+                    <p>
+                    <button
+                        onclick="loadSessionDetails('${session.session_id}')">
+                        View Details
+                    </button>
+                    </p>
+
+                    <p>
+                    <button
+                        onclick="logoutSession('${session.session_id}')">
+                        Logout
+                    </button>
+                    </p>
+                </div>
+            `;
+        });
+
+    }
+
+}
+
+async function loadSessionDetails(sessionId) {
+
+    console.log("Session clicked:", sessionId);
+
+    let token = getAccessToken();
+
+    let res = await fetch(`/sessions/${sessionId}`, {
+        headers: {
+            "Authorization": `Bearer ${token}`
+        }
+    });
+
+    if (res.status === 401) {
+
+        const refreshed = await refreshAccessToken();
+
+        if (!refreshed) {
+            logout();
+            return;
+        }
+
+        token = getAccessToken();
+
+        res = await fetch(`/sessions/${sessionId}`, {
+            headers: {
+                "Authorization": `Bearer ${token}`
+            }
+        });
+    }
+
+    console.log("Status:", res.status);
+
+    if (!res.ok) {
+        const error = await res.json();
+        console.log("Error:", error);
+        alert(error.detail || "Unable to load session details.");
+        return;
+    }
+
+    const data = await res.json();
+
+    console.log("Response:", data);
+
+    document.getElementById("session-details").innerHTML = `
+        <p><strong>Session ID:</strong> ${data.session_id}</p>
+        <p><strong>Device:</strong> ${data.device_name || "Unknown Device"}</p>
+        <p><strong>IP Address:</strong> ${data.ip_address || "Unknown"}</p>
+        <p><strong>User Agent:</strong> ${data.user_agent || "Unknown"}</p>
+        <p><strong>Created:</strong> ${new Date(data.created_at).toLocaleString()}</p>
+        <p><strong>Last Active:</strong> ${new Date(data.last_active).toLocaleString()}</p>
+        <p><strong>Status:</strong> ${data.is_active ? "Active" : "Inactive"}</p>
+    `;
+}
+
+async function logoutSession(sessionId) {
+
+    const confirmed = confirm(
+        "Are you sure you want to logout this device?"
+    );
+
+    if (!confirmed) {
+        return;
+    }
+
+    let token = getAccessToken();
+
+    let res = await fetch(
+        `/sessions/${sessionId}`,
+        {
+            method: "DELETE",
+            headers: {
+                "Authorization": `Bearer ${token}`
+            }
+        }
+    );
+
+    if (res.status === 401) {
+
+        const refreshed = await refreshAccessToken();
+
+        if (!refreshed) {
+            logout();
+            return;
+        }
+
+        token = getAccessToken();
+
+        res = await fetch(
+            `/sessions/${sessionId}`,
+            {
+                method: "DELETE",
+                headers: {
+                    "Authorization": `Bearer ${token}`
+                }
+            }
+        );
+    }
+
+    if (!res.ok) {
+
+        const data = await res.json();
+
+        alert(data.detail || "Unable to logout session.");
+
+        return;
+    }
+
+    alert("Session logged out successfully.");
+
+    // Refresh the dashboard so the UI stays in sync
+    loadSessionDashboard();
+
+    // Clear the details panel, since the selected session may no longer exist
+    document.getElementById("session-details").innerHTML =
+        "Select a session to view details.";
+}

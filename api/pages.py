@@ -38,6 +38,15 @@ async def dashboard_page(request: Request):
         }
     )
 
+@router.get("/session-dashboard")
+async def session_dashboard_page(request: Request):
+    return templates.TemplateResponse(
+        "session_dashboard.html",
+        {
+            "request": request
+        }
+    )
+
 @router.get("/forgot-password")
 async def forgot_password_page(request: Request):
     return templates.TemplateResponse(

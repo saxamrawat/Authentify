@@ -48,6 +48,10 @@
         loadUsers();
     }
 
+    if (window.location.pathname === "/session-dashboard") {
+        requireAuth();
+        loadSessionDashboard();
+    }
     </script>
 
 </body>

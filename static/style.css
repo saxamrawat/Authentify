@@ -295,3 +295,10 @@ td button {
         overflow-x: auto;
     }
 }
+
+.session-card {
+    padding: 15px;
+    margin-bottom: 15px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+}

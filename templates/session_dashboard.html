@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}
+Session Dashboard
+{% endblock %}
+
+{% block content %}
+
+<div class="dashboard-card">
+
+    <h1>
+        Session Dashboard
+    </h1>
+
+    <p>
+        Manage your active devices and sessions.
+    </p>
+
+    <div id="session-summary">
+
+        <h3>Overview</h3>
+
+        <hr>
+        <br>
+        <p>
+            Total Sessions:
+            <span id="total-sessions">-</span>
+        </p>
+
+        <p>
+            Active Sessions:
+            <span id="active-sessions">-</span>
+        </p>
+
+    </div>
+
+    <hr>
+    <br>
+
+    <h3>Current Session</h3>
+
+    <br>
+
+    <div id="current-session">
+
+        Loading current session...
+
+    </div>
+
+    <br>
+
+    <hr>
+
+    <h3>Other Sessions</h3>
+
+    <div id="other-sessions">
+
+        Loading sessions...
+
+    </div>
+
+    <hr>
+
+    <h3>Session Details</h3>
+
+    <div id="session-details">
+
+        Select a session to view details.
+
+    </div>
+
+    <button onclick="window.location.href='/dashboard'">
+        Back To Dashboard
+    </button>
+
+</div>
+
+{% endblock %}

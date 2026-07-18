@@ -42,7 +42,7 @@ oauth2_bearer = OAuth2PasswordBearer(
 async def get_current_user(token: Annotated[str, Depends(oauth2_bearer)], db: Session = Depends(get_db)):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        # Validate token type
+
         if payload.get("token_type") != "access":
             raise InvalidTokenTypeException()
 
@@ -56,20 +56,28 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_bearer)], db: Se
         if username is None or user_id is None:
             raise InvalidCredentialsException()
 
-        # Update Last Active
-        SessionService.update_last_active(
+        session_uuid = UUID(session_id)
+
+        SessionService.validate_active_session(
             db=db,
-            session_id=session_id
+            session_id=session_uuid
         )
 
-        # Find user
+        SessionService.update_last_active(
+            db=db,
+            session_id=session_uuid
+        )
+
         user = UserRepository.get_by_id(db, user_id)
         if not user:
             raise UserNotFoundException()
 
-        # Check account lock
-        if (user.locked_until and user.locked_until > datetime.now(timezone.utc)):
+        if (
+            user.locked_until
+            and user.locked_until > datetime.now(timezone.utc)
+        ):
             raise UserLockedException()
+
         return user
 
     except JWTError:
