@@ -4,7 +4,7 @@
 
 from datetime import datetime, timedelta, timezone
 from jose import jwt
-from passlib.context import CryptContext
+import hashlib
 import uuid
 
 #Core
@@ -12,9 +12,6 @@ from core.security import(
     SECRET_KEY,
     ALGORITHM
 )
-
-#Bcrypt Context
-bcrypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 class TokenService:
 
@@ -52,6 +49,16 @@ class TokenService:
         }
 
         return jwt.encode(payload, SECRET_KEY, ALGORITHM)
+
+    @staticmethod
+    def hash_token(token: str) -> str:
+        """
+        Returns a deterministic SHA-256 hash of the refresh token.
+
+        The raw refresh token is never stored in the database.
+        This hash is used for direct database lookup.
+        """
+        return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
     @staticmethod
     def create_email_verification_token(user_id: int, expire_delta: timedelta):

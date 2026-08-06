@@ -34,9 +34,10 @@ class RefreshToken(Base):
 
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"))
-    hashed_token = Column(String)
+    token_hash = Column(String(64), nullable=False)
     expires_at = Column(DateTime(timezone=True))
     is_revoked = Column(Boolean, default=False)
+
     session = relationship(
         "UserSession",
         back_populates="refresh_token",
@@ -49,7 +50,7 @@ class EmailVerification(Base):
 
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"))
-    hashed_token = Column(String)
+    token_hash = Column(String(64), nullable=False)
     expires_at = Column(DateTime(timezone=True))
 
 #Password Reset Model
@@ -58,7 +59,7 @@ class PasswordReset(Base):
 
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"))
-    hashed_token = Column(String)
+    token_hash = Column(String(64), nullable=False)
     expires_at = Column(DateTime(timezone=True))
 
 

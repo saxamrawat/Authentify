@@ -13,18 +13,17 @@ from services.token_service import TokenService
 from services.session_service import SessionService
 from services.refresh_token_service import RefreshTokenService
 from services.email_service import EmailService
+from services.email_verification_service import EmailVerificationService
+from services.password_reset_service import PasswordResetService
 
 # Repositories
 from repositories.user_repository import UserRepository
-from repositories.refresh_token_repository import RefreshTokenRepository
-from repositories.email_verification_repository import EmailVerificationRepository
-from repositories.password_reset_repository import PasswordResetRepository
 
 #Schemas
 from schemas.auth import CreateUserRequest, ResetPasswordRequest, RefreshRequest,Token, LogOutRequest
 
 #Models
-from models.models import Users, EmailVerification, PasswordReset
+from models.models import Users
 
 #Utils
 from utils.rate_limiter import check_rate_limit
@@ -37,7 +36,9 @@ from core.security import(
     SECRET_KEY,
     ALGORITHM,
     ACCESS_TOKEN_EXPIRE_MINUTES,
-    REFRESH_TOKEN_EXPIRE_DAYS
+    REFRESH_TOKEN_EXPIRE_DAYS,
+    EMAIL_VERIFICATION_EXPIRE_MINUTES,
+    PASSWORD_RESET_EXPIRE_MINUTES
 )
 from core.exceptions import (
     InvalidCredentialsException,
@@ -91,20 +92,18 @@ class AuthService:
         # Retrieving User
         db.refresh(create_user_model)
 
-        # Creating and Hashing Email Verification Token
-        email_verification_token = TokenService.create_email_verification_token(create_user_model.id, timedelta(minutes=15))
-
-        hashed_email_token = bcrypt_context.hash(email_verification_token)
-
-        # Creating and committing an entry to the DB
-        email_verification_model = EmailVerification(
-            user_id=create_user_model.id,
-            hashed_token=hashed_email_token,
-            expires_at=datetime.now(timezone.utc) + timedelta(minutes=15)
+        email_verification_token = (
+            TokenService.create_email_verification_token(
+                create_user_model.id,
+                timedelta(minutes=EMAIL_VERIFICATION_EXPIRE_MINUTES)
+            )
         )
 
-        db.add(email_verification_model)
-        db.commit()
+        EmailVerificationService.create_verification_record(
+            db=db,
+            user_id=create_user_model.id,
+            verification_token=email_verification_token
+        )
 
         # Sending Verification Email to User
         frontend_url = FRONTEND_URL
@@ -223,12 +222,14 @@ class AuthService:
         refresh_token_record = (
             RefreshTokenService.get_valid_refresh_token(
                 db=db,
-                user_id=user_id,
                 refresh_token=refresh_token
             )
         )
 
         if not refresh_token_record:
+            raise RefreshTokenNotRecognizedException()
+
+        if refresh_token_record.user_id != user_id:
             raise RefreshTokenNotRecognizedException()
 
         # Check Expiry
@@ -327,10 +328,16 @@ class AuthService:
         refresh_token_record = (
             RefreshTokenService.get_valid_refresh_token(
                 db=db,
-                user_id=user_id,
                 refresh_token=refresh_token
             )
         )
+
+        if not refresh_token_record:
+            raise RefreshTokenNotRecognizedException()
+
+        if refresh_token_record.user_id != user_id:
+            raise RefreshTokenNotRecognizedException()
+
 
         SessionService.revoke_session_by_refresh_token(
             db=db,
@@ -359,25 +366,27 @@ class AuthService:
 
         user_id = payload.get("sub")
 
-        # Find matching token in DB
-        tokens = EmailVerificationRepository.get_user_tokens(db, user_id)
-
-        valid_token = None
-
-        for t in tokens:
-            if bcrypt_context.verify(token, t.hashed_token):
-                valid_token = t
-                break
-
-        if not valid_token:
+        if user_id is None:
             raise InvalidTokenException()
 
-        # Check expiry
-        if valid_token.expires_at < datetime.now(timezone.utc):
+        user_id = int(user_id)
+
+        verification_record = (
+            EmailVerificationService.get_valid_verification_token(
+                db=db,
+                verification_token=token,
+            )
+        )
+
+        if not verification_record:
+            raise InvalidTokenException()
+
+        if verification_record.user_id != int(user_id):
             raise InvalidTokenException()
 
         # Get user
         user = UserRepository.get_by_id(db, user_id)
+
         if not user:
             raise InvalidTokenException()
 
@@ -385,7 +394,10 @@ class AuthService:
         user.is_verified = True
 
         # Cleanup all tokens for this user
-        EmailVerificationRepository.delete_user_tokens(db, user_id)
+        EmailVerificationService.delete_user_tokens(
+            db=db,
+            user_id=user_id,
+        )
 
         db.add(user)
         db.commit()
@@ -399,19 +411,21 @@ class AuthService:
         if not user:
             return {"message": "If the account exists, a reset link has been sent."}
 
-        PasswordResetRepository.delete_user_tokens(db, user.id)
-        db.commit()
-
-        reset_token = TokenService.create_password_reset_token(user.id, timedelta(minutes=15))
-        hashed_reset_token = bcrypt_context.hash(reset_token)
-        password_reset_model = PasswordReset(
+        PasswordResetService.delete_user_tokens(
+            db=db,
             user_id=user.id,
-            hashed_token=hashed_reset_token,
-            expires_at=datetime.now(timezone.utc) + timedelta(minutes=15)
         )
 
-        db.add(password_reset_model)
-        db.commit()
+        reset_token = TokenService.create_password_reset_token(
+            user.id,
+            timedelta(minutes=PASSWORD_RESET_EXPIRE_MINUTES)
+        )
+
+        PasswordResetService.create_reset_record(
+            db=db,
+            user_id=user.id,
+            reset_token=reset_token,
+        )
 
         # Send email for Password Reset
         frontend_url = FRONTEND_URL
@@ -451,20 +465,19 @@ class AuthService:
 
         user_id = int(user_id)
 
-        tokens = PasswordResetRepository.get_user_tokens(db, user_id)
-        valid_token = None
+        reset_record = (
+            PasswordResetService.get_valid_reset_token(
+                db=db,
+                reset_token=reset_request.token,
+            )
+        )
 
-        for t in tokens:
-            if bcrypt_context.verify(reset_request.token, t.hashed_token):
-                valid_token = t
-                break
-
-        if not valid_token:
+        if not reset_record:
             raise InvalidTokenException()
 
-        # check expiry
-        if valid_token.expires_at < datetime.now(timezone.utc):
+        if reset_record.user_id != user_id:
             raise InvalidTokenException()
+
         # find user
         user = UserRepository.get_by_id(db, user_id)
         if not user:
@@ -475,7 +488,10 @@ class AuthService:
         user.hashed_password = hashed_new_password
 
         # delete reset tokens
-        PasswordResetRepository.delete_user_tokens(db, user_id)
+        PasswordResetService.delete_user_tokens(
+            db=db,
+            user_id=user_id,
+        )
 
         # invalidate Refresh Token
         RefreshTokenService.revoke_all_refresh_tokens(db, user_id)

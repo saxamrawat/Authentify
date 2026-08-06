@@ -17,8 +17,26 @@ class EmailVerificationRepository:
 
     @staticmethod
     def get_user_tokens(db: Session, user_id: int):
-        return db.query(EmailVerification).filter(EmailVerification.user_id == user_id).all()
+        return (
+                db.query(EmailVerification)
+                .filter(EmailVerification.user_id == user_id)
+                .all()
+        )
+
+    @staticmethod
+    def get_by_token_hash(db: Session, token_hash: str):
+        return (
+            db.query(EmailVerification)
+            .filter(
+                EmailVerification.token_hash == token_hash
+            )
+            .first()
+        )
 
     @staticmethod
     def delete_user_tokens(db: Session, user_id: int):
-        db.query(EmailVerification).filter(EmailVerification.user_id == user_id).delete()
+        (
+            db.query(EmailVerification)
+            .filter(EmailVerification.user_id == user_id)
+            .delete()
+        )

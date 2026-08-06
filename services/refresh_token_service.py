@@ -4,37 +4,33 @@
 
 from datetime import datetime, timezone, timedelta
 from sqlalchemy.orm import Session
-from passlib.context import CryptContext
 from models.models import RefreshToken
 
 # Repositories
 from repositories.refresh_token_repository import RefreshTokenRepository
 
+# Services
+from services.token_service import TokenService
+
 # Core
 from core.security import REFRESH_TOKEN_EXPIRE_DAYS
-
-bcrypt_context = CryptContext(
-    schemes=["bcrypt"],
-    deprecated="auto"
-)
 
 
 class RefreshTokenService:
 
     @staticmethod
     def create_refresh_token_record(db: Session, user_id: int, refresh_token: str) -> RefreshToken:
-        hashed_refresh = bcrypt_context.hash(
+
+        token_hash = TokenService.hash_token(
             refresh_token
         )
 
         refresh_token_model = RefreshToken(
             user_id=user_id,
-            hashed_token=hashed_refresh,
+            token_hash=token_hash,
             expires_at=(
-                datetime.now(timezone.utc)
-                + timedelta(
-                    days=REFRESH_TOKEN_EXPIRE_DAYS
-                )
+                    datetime.now(timezone.utc)
+                    + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
             ),
             is_revoked=False
         )
@@ -46,23 +42,15 @@ class RefreshTokenService:
         return refresh_token_model
 
     @staticmethod
-    def get_valid_refresh_token(db: Session, user_id: int, refresh_token: str):
-        tokens = (
-            RefreshTokenRepository
-            .get_user_tokens(
-                db,
-                user_id
-            )
+    def get_valid_refresh_token(db: Session, refresh_token: str):
+        token_hash = TokenService.hash_token(
+            refresh_token
         )
 
-        for token in tokens:
-            if bcrypt_context.verify(
-                refresh_token,
-                token.hashed_token
-            ):
-                return token
-
-        return None
+        return RefreshTokenRepository.get_by_token_hash(
+            db=db,
+            token_hash=token_hash
+        )
 
     @staticmethod
     def revoke_refresh_token(db: Session, refresh_token_record: RefreshToken):
