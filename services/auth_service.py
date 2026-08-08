@@ -237,18 +237,34 @@ class AuthService:
         if refresh_token_record.expires_at < datetime.now(timezone.utc):
             raise RefreshTokenExpiredException()
 
-        # Reuse Detection
-        if refresh_token_record.is_revoked:
-            RefreshTokenService.revoke_all_refresh_tokens(db, user_id)
-            SessionService.revoke_all_sessions(db, user_id)
-            raise SessionSecurityViolationException()
-
+        # Find the session associated with this refresh token
         user_session = (
             SessionService.get_session_by_refresh_token(
                 db=db,
                 refresh_token_id=refresh_token_record.id
             )
         )
+
+        if refresh_token_record.is_revoked:
+
+            # Token belongs to an already revoked/inactive session.
+            # This is an expected consequence of session logout.
+            if user_session and not user_session.is_active:
+                raise SessionSecurityViolationException()
+
+            # Token is revoked but its session is still active.
+            # This indicates possible refresh-token reuse.
+            RefreshTokenService.revoke_all_refresh_tokens(
+                db=db,
+                user_id=user_id
+            )
+
+            SessionService.revoke_all_sessions(
+                db=db,
+                user_id=user_id
+            )
+
+            raise SessionSecurityViolationException()
 
         if not user_session:
             raise RefreshTokenNotRecognizedException()
