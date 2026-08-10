@@ -144,7 +144,7 @@ class SessionService:
     @staticmethod
     def get_session_dashboard(db: Session, user_id: int, current_session_id: UUID) -> SessionDashboardResponse:
 
-        sessions = SessionRepository.get_all_by_user_id(
+        sessions = SessionRepository.get_active_by_user_id(
             db=db,
             user_id=user_id
         )
@@ -180,10 +180,7 @@ class SessionService:
 
         return SessionDashboardResponse(
             total_sessions=len(sessions),
-            active_sessions=sum(
-                1 for session in sessions
-                if session.is_active
-            ),
+            active_sessions=len(sessions),
             current_session=current_session,
             other_sessions=other_sessions
         )

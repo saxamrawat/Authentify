@@ -1,5 +1,5 @@
 /* =========================
-   GLOBAL RESET
+GLOBAL RESET
 ========================= */
 
 * {
@@ -8,8 +8,9 @@
     box-sizing: border-box;
 }
 
+
 /* =========================
-   BODY
+BODY
 ========================= */
 
 body {
@@ -19,8 +20,9 @@ body {
     min-height: 100vh;
 }
 
+
 /* =========================
-   NAVBAR
+NAVBAR
 ========================= */
 
 .navbar {
@@ -35,7 +37,7 @@ body {
 
     padding: 0 40px;
 
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
 .logo {
@@ -70,20 +72,21 @@ body {
 }
 
 .unstyled-link {
-  text-decoration: none;
-  color: inherit;
+    text-decoration: none;
+    color: inherit;
 }
 
 .unstyled-link:visited,
 .unstyled-link:hover,
 .unstyled-link:active,
 .unstyled-link:focus {
-  color: inherit;
-  text-decoration: none;
+    color: inherit;
+    text-decoration: none;
 }
 
+
 /* =========================
-   PAGE CONTAINER
+PAGE CONTAINER
 ========================= */
 
 .page-container {
@@ -97,8 +100,9 @@ body {
     padding: 40px 20px;
 }
 
+
 /* =========================
-   CARD / FORM CONTAINER
+CARD / FORM CONTAINER
 ========================= */
 
 .card {
@@ -111,11 +115,12 @@ body {
 
     border-radius: 14px;
 
-    box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
 }
 
+
 /* =========================
-   HEADINGS
+HEADINGS
 ========================= */
 
 h1 {
@@ -134,8 +139,9 @@ p {
     line-height: 1.6;
 }
 
+
 /* =========================
-   INPUTS
+INPUTS
 ========================= */
 
 input {
@@ -158,8 +164,9 @@ input:focus {
     border-color: #2563eb;
 }
 
+
 /* =========================
-   BUTTONS
+BUTTONS
 ========================= */
 
 button {
@@ -185,8 +192,9 @@ button:hover {
     background-color: #1d4ed8;
 }
 
+
 /* =========================
-   LINKS
+LINKS
 ========================= */
 
 a {
@@ -198,8 +206,9 @@ a:hover {
     text-decoration: underline;
 }
 
+
 /* =========================
-   DASHBOARD
+DASHBOARD
 ========================= */
 
 .dashboard-card {
@@ -209,14 +218,15 @@ a:hover {
 
     border-radius: 14px;
 
-    box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
 
     max-width: 700px;
     width: 100%;
 }
 
+
 /* =========================
-   ADMIN TABLE
+ADMIN TABLE
 ========================= */
 
 table {
@@ -230,7 +240,7 @@ table {
 
     margin-top: 20px;
 
-    box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
 }
 
 thead {
@@ -238,7 +248,8 @@ thead {
     color: white;
 }
 
-th, td {
+th,
+td {
     padding: 16px;
     text-align: left;
 }
@@ -254,8 +265,9 @@ td button {
     margin-bottom: 5px;
 }
 
+
 /* =========================
-   STATUS TEXT
+STATUS TEXT
 ========================= */
 
 .status-success {
@@ -268,8 +280,9 @@ td button {
     font-weight: bold;
 }
 
+
 /* =========================
-   RESPONSIVE
+RESPONSIVE
 ========================= */
 
 @media (max-width: 768px) {
@@ -296,9 +309,341 @@ td button {
     }
 }
 
+
+/* =========================
+SESSION DASHBOARD
+========================= */
+
+.session-dashboard {
+    background-color: white;
+
+    width: 100%;
+    max-width: 850px;
+
+    padding: 40px;
+
+    border-radius: 14px;
+
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+}
+
+.session-dashboard h1 {
+    margin-bottom: 10px;
+}
+
+.session-dashboard > p {
+    color: #6b7280;
+    margin-bottom: 30px;
+}
+
+#session-summary {
+    margin-bottom: 25px;
+}
+
+#session-summary h3 {
+    margin-bottom: 10px;
+}
+
+#current-session,
+#other-sessions {
+    width: 100%;
+}
+
+
+/* =========================
+SESSION CARDS
+========================= */
+
 .session-card {
-    padding: 15px;
-    margin-bottom: 15px;
-    border: 1px solid #ddd;
-    border-radius: 8px;
+    padding: 22px;
+
+    margin-bottom: 16px;
+
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+
+    background-color: #ffffff;
+
+    transition: box-shadow 0.2s ease;
+}
+
+.session-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.current-session-card {
+    border-width: 2px;
+}
+
+.session-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    margin-bottom: 18px;
+}
+
+.session-device {
+    display: flex;
+    align-items: center;
+
+    gap: 12px;
+
+    min-width: 0;
+}
+
+.session-device-icon {
+    font-size: 28px;
+
+    flex-shrink: 0;
+}
+
+.session-device h4 {
+    margin: 0 0 6px 0;
+
+    font-size: 18px;
+
+    overflow-wrap: anywhere;
+}
+
+.session-active-badge,
+.session-current-badge {
+    display: inline-block;
+
+    font-size: 12px;
+
+    padding: 4px 8px;
+
+    border-radius: 12px;
+
+    background-color: #f3f4f6;
+}
+
+.session-info-item {
+    display: flex;
+    justify-content: space-between;
+
+    gap: 20px;
+
+    padding: 9px 0;
+
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.session-info-item:last-child {
+    border-bottom: none;
+}
+
+.session-info-label {
+    font-weight: 600;
+
+    flex-shrink: 0;
+}
+
+.session-info-value {
+    text-align: right;
+
+    word-break: break-word;
+}
+
+.session-card-actions {
+    display: flex;
+
+    justify-content: flex-end;
+
+    gap: 10px;
+
+    margin-top: 18px;
+}
+
+
+/* =========================
+SESSION BUTTON OVERRIDES
+========================= */
+
+.session-dashboard button {
+    width: auto;
+}
+
+.session-card-actions button {
+    width: auto;
+
+    padding: 10px 16px;
+}
+
+.session-modal-actions button {
+    width: auto;
+
+    padding: 10px 16px;
+}
+
+
+/* =========================
+SESSION MODALS
+========================= */
+
+.modal-overlay {
+    display: none;
+
+    position: fixed;
+
+    inset: 0;
+
+    width: 100%;
+    height: 100%;
+
+    padding: 20px;
+
+    background: rgba(0, 0, 0, 0.5);
+
+    align-items: center;
+    justify-content: center;
+
+    z-index: 1000;
+}
+
+.session-modal {
+    width: 100%;
+    max-width: 500px;
+
+    max-height: 90vh;
+
+    overflow-y: auto;
+
+    background: white;
+
+    border-radius: 12px;
+
+    padding: 24px;
+
+    box-sizing: border-box;
+}
+
+.session-modal-header {
+    display: flex;
+
+    justify-content: space-between;
+    align-items: center;
+
+    margin-bottom: 20px;
+}
+
+.session-modal-header h3 {
+    margin: 0;
+}
+
+.modal-close-button {
+    width: auto;
+
+    border: none;
+
+    background: none;
+
+    color: #222;
+
+    font-size: 28px;
+
+    cursor: pointer;
+
+    padding: 0 5px;
+}
+
+.modal-close-button:hover {
+    background: none;
+}
+
+.session-modal-actions {
+    display: flex;
+
+    justify-content: flex-end;
+
+    gap: 10px;
+
+    margin-top: 24px;
+}
+
+
+/* =========================
+SESSION STATES
+========================= */
+
+.session-state {
+    padding: 24px;
+
+    text-align: center;
+
+    border: 1px solid #e5e7eb;
+
+    border-radius: 10px;
+
+    margin-bottom: 16px;
+
+    color: #6b7280;
+}
+
+.session-empty-state {
+    padding: 30px 20px;
+}
+
+.session-error-state {
+    padding: 30px 20px;
+}
+
+.session-error-state p {
+    margin-bottom: 16px;
+}
+
+
+/* =========================
+CONFIRMATION MODAL
+========================= */
+
+.confirmation-modal {
+    max-width: 450px;
+}
+
+#confirmation-message {
+    line-height: 1.6;
+}
+
+
+/* =========================
+SESSION DASHBOARD - MOBILE
+========================= */
+
+@media (max-width: 768px) {
+
+    .session-dashboard {
+        padding: 25px 20px;
+    }
+
+    .session-card {
+        padding: 18px;
+    }
+
+    .session-info-item {
+        flex-direction: column;
+
+        gap: 4px;
+    }
+
+    .session-info-value {
+        text-align: left;
+    }
+
+    .session-card-actions {
+        justify-content: stretch;
+    }
+
+    .session-card-actions button {
+        width: 100%;
+    }
+
+    .session-modal-actions {
+        flex-direction: column-reverse;
+    }
+
+    .session-modal-actions button {
+        width: 100%;
+    }
 }

@@ -6,7 +6,7 @@ Session Dashboard
 
 {% block content %}
 
-<div class="dashboard-card">
+<div class="session-dashboard">
 
     <h1>
         Session Dashboard
@@ -20,12 +20,7 @@ Session Dashboard
 
         <h3>Overview</h3>
 
-        <hr>
         <br>
-        <p>
-            Total Sessions:
-            <span id="total-sessions">-</span>
-        </p>
 
         <p>
             Active Sessions:
@@ -53,25 +48,135 @@ Session Dashboard
 
     <h3>Other Sessions</h3>
 
+    <br>
+
     <div id="other-sessions">
 
         Loading sessions...
 
     </div>
 
+    <br>
+
     <hr>
 
-    <h3>Session Details</h3>
+    <div id="logout-all-section">
 
-    <div id="session-details">
+        <h3>Security</h3>
 
-        Select a session to view details.
+        <br>
+
+        <button onclick="logoutAllDevices()">
+            Logout All Devices
+        </button>
 
     </div>
+
+    <br>
+
+    <hr>
+
+    <br>
 
     <button onclick="window.location.href='/dashboard'">
         Back To Dashboard
     </button>
+
+</div>
+
+
+<!-- Session Details Modal -->
+
+<div
+    id="session-details-modal"
+    class="modal-overlay">
+
+    <div class="session-modal">
+
+        <div class="session-modal-header">
+
+            <h3>
+                Session Details
+            </h3>
+
+            <button
+                class="modal-close-button"
+                onclick="closeSessionDetails()">
+                ×
+            </button>
+
+        </div>
+
+        <div id="session-details-content">
+
+            Loading session details...
+
+        </div>
+
+        <div class="session-modal-actions">
+
+            <button
+                id="modal-logout-button"
+                onclick="logoutSessionFromModal()">
+                Logout This Device
+            </button>
+
+            <button
+                onclick="closeSessionDetails()">
+                Close
+            </button>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+<!-- Confirmation Modal -->
+
+<div
+    id="confirmation-modal"
+    class="modal-overlay">
+
+    <div class="session-modal confirmation-modal">
+
+        <div class="session-modal-header">
+
+            <h3 id="confirmation-title">
+                Confirm Action
+            </h3>
+
+            <button
+                class="modal-close-button"
+                onclick="closeConfirmationModal()">
+                ×
+            </button>
+
+        </div>
+
+        <div id="confirmation-message">
+
+            Are you sure?
+
+        </div>
+
+        <div class="session-modal-actions">
+
+            <button
+                onclick="closeConfirmationModal()">
+                Cancel
+            </button>
+
+            <button
+                id="confirmation-action-button"
+                onclick="confirmPendingAction()">
+                Confirm
+            </button>
+
+        </div>
+
+    </div>
 
 </div>
 

@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 from fastapi.security import OAuth2PasswordRequestForm
 from jose import jwt, JWTError
+from core.device import get_device_name
 
 #Services
 from services.token_service import TokenService
@@ -124,7 +125,7 @@ class AuthService:
     @staticmethod
     def login(db : Session, form_data: OAuth2PasswordRequestForm, ip_address : str, user_agent : str | None):
 
-        device_name = user_agent
+        device_name = get_device_name(user_agent)
 
         if not check_rate_limit(ip_address, 5, timedelta(minutes=1)):
             raise TooManyLoginAttemptsException()
