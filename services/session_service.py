@@ -23,9 +23,11 @@ from core.exceptions import (
     SessionAccessDeniedException,
     SessionInvalidException
 )
+from core.security import ACCESS_TOKEN_EXPIRE_MINUTES
 
 # Services
 from services.refresh_token_service import RefreshTokenService
+from services.revocation import RevocationStore
 
 
 class SessionService:
@@ -193,7 +195,7 @@ class SessionService:
         )
 
     @staticmethod
-    def revoke_session(db: Session, user_id: int, session_id: UUID) -> bool:
+    async def revoke_session(db: Session, user_id: int, session_id: UUID, revocation_store: RevocationStore) -> bool:
 
         session = SessionRepository.get_by_id(
             db=db,
@@ -216,10 +218,15 @@ class SessionService:
             refresh_token_id=session.refresh_token_id
         )
 
+        await revocation_store.revoke_session(
+            session_id=session_id,
+            ttl_seconds=ACCESS_TOKEN_EXPIRE_MINUTES * 60, #(in seconds)
+        )
+
         return True
 
     @staticmethod
-    def revoke_all_sessions(db: Session, user_id: int) -> MessageResponse:
+    async def revoke_all_sessions(db: Session, user_id: int, revocation_store: RevocationStore) -> MessageResponse:
 
         active_sessions = (
             SessionRepository.get_active_by_user_id(
@@ -239,6 +246,11 @@ class SessionService:
                 session_obj=session
             )
 
+            await revocation_store.revoke_session(
+                session_id=session.id,
+                ttl_seconds=ACCESS_TOKEN_EXPIRE_MINUTES * 60, #(in seconds)
+            )
+
         return MessageResponse(
             message="All sessions revoked successfully."
         )
@@ -253,7 +265,7 @@ class SessionService:
         )
 
     @staticmethod
-    def revoke_session_by_refresh_token(db: Session, refresh_token_id: int) -> bool:
+    async def revoke_session_by_refresh_token(db: Session, refresh_token_id: int, revocation_store: RevocationStore) -> bool:
 
         session = (
             SessionRepository.get_by_refresh_token_id(
@@ -268,6 +280,11 @@ class SessionService:
         SessionRepository.revoke(
             db=db,
             session_obj=session
+        )
+
+        await revocation_store.revoke_session(
+            session_id=session.id,
+            ttl_seconds=ACCESS_TOKEN_EXPIRE_MINUTES * 60, #(in seconds)
         )
 
         return True

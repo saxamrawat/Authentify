@@ -8,6 +8,7 @@ from passlib.context import CryptContext
 from fastapi.security import OAuth2PasswordRequestForm
 from jose import jwt, JWTError
 from core.device import get_device_name
+import hashlib
 
 #Services
 from services.token_service import TokenService
@@ -16,6 +17,8 @@ from services.refresh_token_service import RefreshTokenService
 from services.email_service import EmailService
 from services.email_verification_service import EmailVerificationService
 from services.password_reset_service import PasswordResetService
+from services.revocation import RevocationStore
+from services.rate_limiter import RateLimiter, RateLimiterError
 
 # Repositories
 from repositories.user_repository import UserRepository
@@ -27,7 +30,7 @@ from schemas.auth import CreateUserRequest, ResetPasswordRequest, RefreshRequest
 from models.models import Users
 
 #Utils
-from utils.rate_limiter import check_rate_limit
+# from utils.rate_limiter import check_rate_limit
 
 #Core
 from core.config import(
@@ -53,7 +56,8 @@ from core.exceptions import (
     TooManyLoginAttemptsException,
     RefreshTokenExpiredException,
     RefreshTokenNotRecognizedException,
-    SessionSecurityViolationException
+    SessionSecurityViolationException,
+    RateLimiterUnavailableException
 )
 
 # Authentication and Hashed Password Dependencies
@@ -123,11 +127,25 @@ class AuthService:
             raise EmailDeliveryFailedException()
 
     @staticmethod
-    def login(db : Session, form_data: OAuth2PasswordRequestForm, ip_address : str, user_agent : str | None):
+    async def login(db: Session, form_data: OAuth2PasswordRequestForm, ip_address: str, user_agent: str | None, rate_limiter: RateLimiter):
 
         device_name = get_device_name(user_agent)
 
-        if not check_rate_limit(ip_address, 5, timedelta(minutes=1)):
+        ip_identifier = hashlib.sha256(
+            ip_address.encode("utf-8")
+        ).hexdigest()
+
+        try:
+            allowed = await rate_limiter.is_allowed(
+                key=f"auth:ratelimit:login:ip:{ip_identifier}",
+                limit=5,
+                window_seconds=60,
+            )
+
+        except RateLimiterError:
+            raise RateLimiterUnavailableException()
+
+        if not allowed:
             raise TooManyLoginAttemptsException()
 
         normalized_username = form_data.username.lower().strip()
@@ -191,9 +209,6 @@ class AuthService:
             expire_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         )
 
-        print("Session ID:", session.id)
-        print("Refresh Token Record ID:", refresh_token_record.id)
-
         # Returning the Token Model
         return Token(
             access_token = access_token,
@@ -202,7 +217,7 @@ class AuthService:
         )
 
     @staticmethod
-    def refresh_access_token(db: Session, refresh_request : RefreshRequest):
+    async def refresh_access_token(db: Session, refresh_request: RefreshRequest, revocation_store: RevocationStore):
         refresh_token = refresh_request.refresh_token
         # Decode JWT
         try:
@@ -255,14 +270,20 @@ class AuthService:
 
             # Token is revoked but its session is still active.
             # This indicates possible refresh-token reuse.
+            # Refresh-token reuse detected.
+            # Treat the event as a potential session/account compromise:
+            # revoke all persistent refresh tokens and sessions,
+            # then propagate session revocation to Redis so existing
+            # access tokens are rejected immediately.
             RefreshTokenService.revoke_all_refresh_tokens(
                 db=db,
                 user_id=user_id
             )
 
-            SessionService.revoke_all_sessions(
+            await SessionService.revoke_all_sessions(
                 db=db,
-                user_id=user_id
+                user_id=user_id,
+                revocation_store=revocation_store
             )
 
             raise SessionSecurityViolationException()
@@ -322,7 +343,7 @@ class AuthService:
         )
 
     @staticmethod
-    def logout(db : Session, logout_request : LogOutRequest):
+    async def logout(db : Session, logout_request : LogOutRequest, revocation_store: RevocationStore):
         refresh_token = logout_request.refresh_token
 
         # decode token
@@ -357,9 +378,10 @@ class AuthService:
             raise RefreshTokenNotRecognizedException()
 
 
-        SessionService.revoke_session_by_refresh_token(
+        await SessionService.revoke_session_by_refresh_token(
             db=db,
-            refresh_token_id=refresh_token_record.id
+            refresh_token_id=refresh_token_record.id,
+            revocation_store=revocation_store
         )
 
         # Revoke Current Refresh Token

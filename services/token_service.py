@@ -17,19 +17,19 @@ class TokenService:
 
     @staticmethod
     def create_access_token(username: str, user_id: int, role: str, session_id: str, expire_delta: timedelta):
+        issued_at = datetime.now(timezone.utc)
+        expires = issued_at + expire_delta
+
         encode = {
             "sub": username,
             "id": user_id,
             "role": role,
             "session_id": session_id,
-            "token_type": "access"
-        }
-
-        expires = datetime.now(timezone.utc) + expire_delta
-
-        encode.update({
+            "token_type": "access",
+            "jti": str(uuid.uuid4()),
+            "iat": issued_at,
             "exp": expires
-        })
+        }
 
         return jwt.encode(
             encode,

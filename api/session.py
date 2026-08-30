@@ -10,9 +10,11 @@ from typing import Annotated
 from dependencies.database import db_dependency
 from dependencies.auth import get_current_user
 from dependencies.auth import get_current_session_id
+from dependencies.redis import get_revocation_store
 
 # Services
 from services.session_service import SessionService
+from services.revocation import RevocationStore
 
 # Schemas
 from schemas.session_schema import SessionResponse
@@ -51,18 +53,20 @@ def get_session_details(db: db_dependency, session_id: UUID, current_user=Depend
     )
 
 @router.post("/logout-all", response_model=MessageResponse)
-def logout_all_devices(db: db_dependency, current_user=Depends(get_current_user)):
-    return SessionService.revoke_all_sessions(
+async def logout_all_devices(db: db_dependency, current_user=Depends(get_current_user), revocation_store: RevocationStore = Depends(get_revocation_store)):
+    return await SessionService.revoke_all_sessions(
         db=db,
-        user_id=current_user.id
+        user_id=current_user.id,
+        revocation_store=revocation_store,
     )
 
 @router.delete("/{session_id}")
-def revoke_session(db: db_dependency, session_id: UUID, current_user=Depends(get_current_user)):
-    return SessionService.revoke_session(
+async def revoke_session(db: db_dependency, session_id: UUID, current_user=Depends(get_current_user), revocation_store: RevocationStore = Depends(get_revocation_store)):
+    return await SessionService.revoke_session(
         db=db,
         user_id=current_user.id,
-        session_id=session_id
+        session_id=session_id,
+        revocation_store=revocation_store,
     )
 
 

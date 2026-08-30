@@ -160,3 +160,10 @@ class SessionInvalidException(HTTPException):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid Session."
         )
+
+class RateLimiterUnavailableException(HTTPException):
+    def __init__(self):
+        super().__init__(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Authentication service temporarily unavailable."
+        )

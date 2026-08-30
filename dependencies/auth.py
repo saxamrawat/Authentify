@@ -12,6 +12,7 @@ from uuid import UUID
 
 # Dependencies
 from dependencies.database import get_db
+from dependencies.redis import get_revocation_store
 
 # Repositories
 from repositories.user_repository import UserRepository
@@ -33,13 +34,17 @@ from core.exceptions import(
 
 # Services
 from services.session_service import SessionService
+from services.revocation import (
+    RevocationStore,
+    RevocationStoreError,
+)
 
 oauth2_bearer = OAuth2PasswordBearer(
     tokenUrl="auth/login"
 )
 
 # Current User Dependency
-async def get_current_user(token: Annotated[str, Depends(oauth2_bearer)], db: Session = Depends(get_db)):
+async def get_current_user(token: Annotated[str, Depends(oauth2_bearer)], db: Session = Depends(get_db), revocation_store: RevocationStore = Depends(get_revocation_store)):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
 
@@ -49,11 +54,22 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_bearer)], db: Se
         username = payload.get("sub")
         user_id = payload.get("id")
         session_id = payload.get("session_id")
+        jti = str(payload.get("jti"))
 
-        if session_id is None:
+        if session_id is None or jti is None:
             raise InvalidTokenException()
 
         if username is None or user_id is None:
+            raise InvalidCredentialsException()
+
+        try:
+            if await revocation_store.is_jti_revoked(jti):
+                raise InvalidTokenException()
+
+            if await revocation_store.is_session_revoked(session_id):
+                raise SessionInvalidException()
+
+        except RevocationStoreError:
             raise InvalidCredentialsException()
 
         session_uuid = UUID(session_id)
