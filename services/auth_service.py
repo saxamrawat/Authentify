@@ -42,7 +42,9 @@ from core.security import(
     ACCESS_TOKEN_EXPIRE_MINUTES,
     REFRESH_TOKEN_EXPIRE_DAYS,
     EMAIL_VERIFICATION_EXPIRE_MINUTES,
-    PASSWORD_RESET_EXPIRE_MINUTES
+    PASSWORD_RESET_EXPIRE_MINUTES,
+    ACCOUNT_LOCK_DAYS,
+    MAX_LOGIN_ATTEMPTS,
 )
 from core.exceptions import (
     InvalidCredentialsException,
@@ -169,8 +171,8 @@ class AuthService:
         # authenticate user
         if not bcrypt_context.verify(form_data.password, user.hashed_password):
             user.failed_attempts += 1
-            if user.failed_attempts >= 3:
-                user.locked_until = datetime.now(timezone.utc) + timedelta(days=3)
+            if user.failed_attempts >= MAX_LOGIN_ATTEMPTS:
+                user.locked_until = datetime.now(timezone.utc) + timedelta(days=ACCOUNT_LOCK_DAYS)
                 RefreshTokenService.revoke_all_refresh_tokens(db, user.id)
             db.add(user)
             db.commit()

@@ -68,6 +68,3 @@ async def revoke_session(db: db_dependency, session_id: UUID, current_user=Depen
         session_id=session_id,
         revocation_store=revocation_store,
     )
-
-
-
