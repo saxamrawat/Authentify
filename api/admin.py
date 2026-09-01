@@ -4,8 +4,6 @@
 
 from typing import Annotated
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
-from database import SessionLocal
 from models.models import Users
 
 # Dependencies
@@ -25,15 +23,6 @@ router = APIRouter(
     tags=["admin"]
 )
 
-# DB dependency function
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-db_dependency = Annotated[Session, Depends(get_db)]
 
 @router.get("/users")
 async def get_all_users(admin_user : Annotated[Users, Depends(require_admin)], db : db_dependency):

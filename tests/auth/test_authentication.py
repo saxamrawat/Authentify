@@ -211,3 +211,122 @@ async def test_login_fails_closed_when_rate_limiter_unavailable():
             user_agent=None,
             rate_limiter=rate_limiter,
         )
+
+# Rate Limiting Before User Lookup
+
+@pytest.mark.asyncio
+async def test_rate_limit_rejection_skips_user_lookup(monkeypatch):
+    user_lookup = MagicMock()
+
+    monkeypatch.setattr(
+        "services.auth_service.UserRepository.get_by_username",
+        user_lookup,
+    )
+
+    rate_limiter = AsyncMock()
+    rate_limiter.is_allowed.return_value = False
+
+    with pytest.raises(TooManyLoginAttemptsException):
+        await AuthService.login(
+            db=MagicMock(),
+            form_data=create_form(),
+            ip_address="127.0.0.1",
+            user_agent=None,
+            rate_limiter=rate_limiter,
+        )
+
+    user_lookup.assert_not_called()
+
+
+# Rate Limiting Does Not Increment Account Lockout
+
+@pytest.mark.asyncio
+async def test_rate_limit_rejection_does_not_increment_failed_attempts(
+    monkeypatch,
+):
+    user = create_user(failed_attempts=2)
+
+    monkeypatch.setattr(
+        "services.auth_service.UserRepository.get_by_username",
+        MagicMock(return_value=user),
+    )
+
+    rate_limiter = AsyncMock()
+    rate_limiter.is_allowed.return_value = False
+
+    with pytest.raises(TooManyLoginAttemptsException):
+        await AuthService.login(
+            db=MagicMock(),
+            form_data=create_form("WrongPassword1!"),
+            ip_address="127.0.0.1",
+            user_agent=None,
+            rate_limiter=rate_limiter,
+        )
+
+    assert user.failed_attempts == 2
+
+@pytest.mark.asyncio
+async def test_login_rate_limit_uses_hashed_ip_key(monkeypatch):
+    user = create_user()
+
+    monkeypatch.setattr(
+        "services.auth_service.UserRepository.get_by_username",
+        MagicMock(return_value=user),
+    )
+
+    monkeypatch.setattr(
+        "services.auth_service.RefreshTokenService.create_refresh_token_record",
+        MagicMock(return_value=SimpleNamespace(id=1)),
+    )
+
+    monkeypatch.setattr(
+        "services.auth_service.SessionService.create_session",
+        MagicMock(return_value=SimpleNamespace(
+            id="session-123"
+        )),
+    )
+
+    rate_limiter = AsyncMock()
+    rate_limiter.is_allowed.return_value = True
+
+    await AuthService.login(
+        db=MagicMock(),
+        form_data=create_form(),
+        ip_address="127.0.0.1",
+        user_agent=None,
+        rate_limiter=rate_limiter,
+    )
+
+    key = rate_limiter.is_allowed.await_args.kwargs["key"]
+
+    assert key.startswith(
+        "auth:ratelimit:login:ip:"
+    )
+
+    assert "127.0.0.1" not in key
+
+@pytest.mark.asyncio
+async def test_login_fails_closed_without_user_lookup(monkeypatch):
+    user_lookup = MagicMock()
+
+    monkeypatch.setattr(
+        "services.auth_service.UserRepository.get_by_username",
+        user_lookup,
+    )
+
+    rate_limiter = AsyncMock()
+    rate_limiter.is_allowed.side_effect = RateLimiterError(
+        "Redis unavailable"
+    )
+
+    with pytest.raises(RateLimiterUnavailableException):
+        await AuthService.login(
+            db=MagicMock(),
+            form_data=create_form(),
+            ip_address="127.0.0.1",
+            user_agent=None,
+            rate_limiter=rate_limiter,
+        )
+
+    user_lookup.assert_not_called()
+

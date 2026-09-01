@@ -8,13 +8,23 @@ def get_device_name(user_agent: str | None) -> str | None:
 
     parsed = parse(user_agent)
 
-    browser = parsed.user_agent.family
-    operating_system = parsed.os.family
+    browser = (
+        parsed.user_agent.family
+        if parsed.user_agent
+        else None
+    )
 
-    device = None
+    operating_system = (
+        parsed.os.family
+        if parsed.os
+        else None
+    )
 
-    if parsed.device:
-        device = parsed.device.family
+    device = (
+        parsed.device.family
+        if parsed.device
+        else None
+    )
 
     if browser and operating_system:
         return f"{browser} on {operating_system}"
