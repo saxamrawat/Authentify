@@ -2,6 +2,7 @@
 
 # Libraries
 from datetime import datetime, timezone
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 from models.models import RefreshToken
 
@@ -83,3 +84,19 @@ class RefreshTokenRepository:
         db.commit()
 
         return count
+
+    @staticmethod
+    def revoke_token_if_active(db: Session, refresh_token_id: int) -> bool:
+        result = (
+            db.query(RefreshToken)
+            .filter(
+                RefreshToken.id == refresh_token_id,
+                RefreshToken.is_revoked.is_(False),
+            )
+            .update(
+                {"is_revoked": True},
+                synchronize_session=False,
+            )
+        )
+
+        return result == 1

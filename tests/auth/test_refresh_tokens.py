@@ -136,28 +136,6 @@ def test_refresh_token_can_be_revoked(db_session):
 
     assert record.is_revoked is True
 
-def test_refresh_token_can_be_revoked(db_session):
-    """Verify revoking a refresh token persists its revoked state."""
-
-    user = create_test_user(
-        db_session,
-        "refresh_revoke",
-    )
-
-    _, record = create_refresh_token_for_user(
-        db_session,
-        user.id,
-    )
-
-    RefreshTokenService.revoke_refresh_token(
-        db=db_session,
-        refresh_token_record=record,
-    )
-
-    db_session.refresh(record)
-
-    assert record.is_revoked is True
-
 @pytest.mark.asyncio
 async def test_refresh_token_rotation_revokes_old_token(
     db_session,

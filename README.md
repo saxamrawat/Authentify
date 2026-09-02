@@ -244,7 +244,7 @@ Refactor the authentication system into a modular, scalable authentication platf
 
 ---
 
-## 🔥 Planned Features
+## Current Progress
 
 ### Architecture Refactoring
 
@@ -270,7 +270,34 @@ Refactor the authentication system into a modular, scalable authentication platf
 - Distributed Rate Limiting
 - Scalable Session Revocation
 
+### Security Testing & Hardening
+  - Authentication and JWT security testing
+  - Access-token and session security testing
+  - Refresh-token lifecycle and replay testing
+  - Password and email verification security testing
+  - Rate limiting and failure-path testing
+  - Authorization and privilege-boundary testing
+  - API security and information-leakage testing
+  - Database and concurrency security testing
+  - Security regression testing
+  - Integration and full regression verification
+  - Final security audit and documentation
+
 ---
+
+### Summary of progress so far...
+Level 3 security architecture and security testing have been completed.
+
+The authentication platform now includes Redis-backed distributed security
+controls, multi-device session management, refresh-token rotation and replay
+detection, transactional/concurrency-safe token handling, PostgreSQL
+integrity guarantees, and a dedicated security regression/integration test
+suite.
+
+Further Level 3 features listed below remain part of the planned roadmap.
+
+## 🔥 Planned Features
+
 
 ### OAuth & External Identity
 
@@ -370,5 +397,5 @@ This is not just an authentication project — it is a progressive exploration o
   - HTTPS/SSL configuration
   - Custom domain integration
 
-**Live URL:**  
+**Live URL(Current Deployment: Level 2):**  
 https://auth.saxam.dev

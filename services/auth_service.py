@@ -219,11 +219,20 @@ class AuthService:
         )
 
     @staticmethod
-    async def refresh_access_token(db: Session, refresh_request: RefreshRequest, revocation_store: RevocationStore):
+    async def refresh_access_token(
+            db: Session,
+            refresh_request: RefreshRequest,
+            revocation_store: RevocationStore,
+    ):
         refresh_token = refresh_request.refresh_token
+
         # Decode JWT
         try:
-            payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+            payload = jwt.decode(
+                refresh_token,
+                SECRET_KEY,
+                algorithms=[ALGORITHM],
+            )
         except JWTError:
             raise RefreshTokenNotRecognizedException()
 
@@ -239,12 +248,11 @@ class AuthService:
         user_id = int(user_id)
 
         # Find Matching Refresh Token in DB
-        refresh_token_record = (
-            RefreshTokenService.get_valid_refresh_token(
-                db=db,
-                refresh_token=refresh_token
-            )
+        refresh_token_record = RefreshTokenService.get_valid_refresh_token(
+            db=db,
+            refresh_token=refresh_token,
         )
+
         if not refresh_token_record:
             raise RefreshTokenNotRecognizedException()
 
@@ -256,11 +264,9 @@ class AuthService:
             raise RefreshTokenExpiredException()
 
         # Find the session associated with this refresh token
-        user_session = (
-            SessionService.get_session_by_refresh_token(
-                db=db,
-                refresh_token_id=refresh_token_record.id
-            )
+        user_session = SessionService.get_session_by_refresh_token(
+            db=db,
+            refresh_token_id=refresh_token_record.id,
         )
 
         if refresh_token_record.is_revoked:
@@ -272,20 +278,19 @@ class AuthService:
 
             # Token is revoked but its session is still active.
             # This indicates possible refresh-token reuse.
-            # Refresh-token reuse detected.
             # Treat the event as a potential session/account compromise:
             # revoke all persistent refresh tokens and sessions,
             # then propagate session revocation to Redis so existing
             # access tokens are rejected immediately.
             RefreshTokenService.revoke_all_refresh_tokens(
                 db=db,
-                user_id=user_id
+                user_id=user_id,
             )
 
             await SessionService.revoke_all_sessions(
                 db=db,
                 user_id=user_id,
-                revocation_store=revocation_store
+                revocation_store=revocation_store,
             )
 
             raise SessionSecurityViolationException()
@@ -297,51 +302,78 @@ class AuthService:
         if not user_session.is_active:
             raise SessionSecurityViolationException()
 
+        try:
+            # Atomically consume the old refresh token.
+            #
+            # Only one concurrent request can successfully change the
+            # token from active -> revoked.
+            consumed = RefreshTokenService.consume_refresh_token(
+                db=db,
+                refresh_token_id=refresh_token_record.id,
+            )
 
-        # Revoking old refresh token
-        RefreshTokenService.revoke_refresh_token(db, refresh_token_record)
+            if not consumed:
+                db.rollback()
+                raise SessionSecurityViolationException()
 
-        # Generate New Access Token
-        user = UserRepository.get_by_id(db, refresh_token_record.user_id)
-        if not user:
-            raise UserNotFoundException()
+            # Generate New Access Token
+            user = UserRepository.get_by_id(
+                db,
+                refresh_token_record.user_id,
+            )
 
-        new_access_token = TokenService.create_access_token(
-            username=user.username,
-            user_id=int(user_id),
-            role=user.role,
-            session_id=str(user_session.id),
-            expire_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-        )
+            if not user:
+                raise UserNotFoundException()
 
-        # Refresh Token Rotation
+            new_access_token = TokenService.create_access_token(
+                username=user.username,
+                user_id=int(user_id),
+                role=user.role,
+                session_id=str(user_session.id),
+                expire_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
+            )
 
-        new_refresh_token = TokenService.create_refresh_token(user.id, timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS))
+            # Refresh Token Rotation
+            new_refresh_token = TokenService.create_refresh_token(
+                user.id,
+                timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS),
+            )
 
-        #Creating new Refresh Token
-        new_refresh_token_record = RefreshTokenService.create_refresh_token_record(
-            db=db,
-            user_id=user.id,
-            refresh_token=new_refresh_token
-        )
+            # Create new refresh-token record.
+            #
+            # This only flushes the INSERT; it does not commit.
+            new_refresh_token_record = (
+                RefreshTokenService.create_refresh_token_record(
+                    db=db,
+                    user_id=user.id,
+                    refresh_token=new_refresh_token,
+                )
+            )
 
-        # Updating Refresh Token for the session
-        SessionService.update_refresh_token(
-            db=db,
-            session_obj=user_session,
-            refresh_token_id=new_refresh_token_record.id
-        )
+            # Update the session to point to the new refresh token.
+            #
+            # This participates in the current transaction and does
+            # not commit independently.
+            SessionService.update_refresh_token_in_transaction(
+                db=db,
+                session_obj=user_session,
+                refresh_token_id=new_refresh_token_record.id,
+            )
 
-        # Update Last Active
-        SessionService.update_last_active(
-            db=db,
-            session_id=user_session.id
-        )
+            # Update Last Active inside the same transaction.
+            user_session.last_active = datetime.now(timezone.utc)
+
+            # Commit the complete refresh-token rotation atomically.
+            db.commit()
+
+        except Exception:
+            db.rollback()
+            raise
 
         return Token(
-            access_token = new_access_token,
-            refresh_token = new_refresh_token,
-            token_type = "bearer"
+            access_token=new_access_token,
+            refresh_token=new_refresh_token,
+            token_type="bearer",
         )
 
     @staticmethod

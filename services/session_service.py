@@ -258,11 +258,16 @@ class SessionService:
     @staticmethod
     def update_refresh_token(db: Session, session_obj: UserSession, refresh_token_id : int):
 
-        return SessionRepository.update_refresh_token(
-            db = db,
+        session = SessionRepository.update_refresh_token(
+            db=db,
             session_obj=session_obj,
-            refresh_token_id=refresh_token_id
+            refresh_token_id=refresh_token_id,
         )
+
+        db.commit()
+        db.refresh(session)
+
+        return session
 
     @staticmethod
     async def revoke_session_by_refresh_token(db: Session, refresh_token_id: int, revocation_store: RevocationStore) -> bool:
@@ -294,4 +299,12 @@ class SessionService:
 
         return SessionRepository.delete_revoked_sessions(
             db=db
+        )
+
+    @staticmethod
+    def update_refresh_token_in_transaction(db: Session, session_obj: UserSession, refresh_token_id: int):
+        return SessionRepository.update_refresh_token(
+            db=db,
+            session_obj=session_obj,
+            refresh_token_id=refresh_token_id,
         )

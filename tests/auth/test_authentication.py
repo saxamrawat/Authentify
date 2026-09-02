@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
-
+from datetime import datetime, timezone, timedelta
 import pytest
 
 from core.exceptions import (
@@ -150,8 +150,10 @@ async def test_unverified_user_cannot_login(monkeypatch):
 
 # Locked User
 @pytest.mark.asyncio
-async def test_unverified_user_cannot_login(monkeypatch):
-    user = create_user(verified=False)
+async def test_locked_user_cannot_login(monkeypatch):
+    user = create_user(
+        locked_until=datetime.now(timezone.utc) + timedelta(minutes=10)
+    )
 
     monkeypatch.setattr(
         "services.auth_service.UserRepository.get_by_username",
@@ -161,7 +163,7 @@ async def test_unverified_user_cannot_login(monkeypatch):
     rate_limiter = AsyncMock()
     rate_limiter.is_allowed.return_value = True
 
-    with pytest.raises(InvalidCredentialsException):
+    with pytest.raises(UserLockedException):
         await AuthService.login(
             db=MagicMock(),
             form_data=create_form(),
@@ -172,8 +174,8 @@ async def test_unverified_user_cannot_login(monkeypatch):
 
 # Rate-limit Rejection
 @pytest.mark.asyncio
-async def test_unverified_user_cannot_login(monkeypatch):
-    user = create_user(verified=False)
+async def test_rate_limit_rejection_blocks_login(monkeypatch):
+    user = create_user()
 
     monkeypatch.setattr(
         "services.auth_service.UserRepository.get_by_username",
@@ -181,9 +183,9 @@ async def test_unverified_user_cannot_login(monkeypatch):
     )
 
     rate_limiter = AsyncMock()
-    rate_limiter.is_allowed.return_value = True
+    rate_limiter.is_allowed.return_value = False
 
-    with pytest.raises(InvalidCredentialsException):
+    with pytest.raises(TooManyLoginAttemptsException):
         await AuthService.login(
             db=MagicMock(),
             form_data=create_form(),

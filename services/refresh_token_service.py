@@ -20,10 +20,7 @@ class RefreshTokenService:
 
     @staticmethod
     def create_refresh_token_record(db: Session, user_id: int, refresh_token: str) -> RefreshToken:
-
-        token_hash = TokenService.hash_token(
-            refresh_token
-        )
+        token_hash = TokenService.hash_token(refresh_token)
 
         refresh_token_model = RefreshToken(
             user_id=user_id,
@@ -32,12 +29,11 @@ class RefreshTokenService:
                     datetime.now(timezone.utc)
                     + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
             ),
-            is_revoked=False
+            is_revoked=False,
         )
 
         db.add(refresh_token_model)
-        db.commit()
-        db.refresh(refresh_token_model)
+        db.flush()
 
         return refresh_token_model
 
@@ -87,4 +83,11 @@ class RefreshTokenService:
 
         return RefreshTokenRepository.delete_expired_tokens(
             db=db
+        )
+
+    @staticmethod
+    def consume_refresh_token(db: Session, refresh_token_id: int) -> bool:
+        return RefreshTokenRepository.revoke_token_if_active(
+            db=db,
+            refresh_token_id=refresh_token_id,
         )

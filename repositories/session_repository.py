@@ -102,12 +102,9 @@ class SessionRepository:
         )
 
     @staticmethod
-    def update_refresh_token(db: Session, session_obj : UserSession, refresh_token_id : int):
+    def update_refresh_token(db: Session, session_obj: UserSession, refresh_token_id: int):
         session_obj.refresh_token_id = refresh_token_id
-
-        db.commit()
-        db.refresh(session_obj)
-
+        db.flush()
         return session_obj
 
     @staticmethod
