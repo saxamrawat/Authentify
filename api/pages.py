@@ -1,3 +1,7 @@
+# Pages API Routers
+
+# Libraries
+
 from fastapi import APIRouter, Request
 from fastapi.templating import Jinja2Templates
 
@@ -31,6 +35,15 @@ async def dashboard_page(request: Request):
         "dashboard.html",
         {
             "request": request,
+        }
+    )
+
+@router.get("/session-dashboard")
+async def session_dashboard_page(request: Request):
+    return templates.TemplateResponse(
+        "session_dashboard.html",
+        {
+            "request": request
         }
     )
 

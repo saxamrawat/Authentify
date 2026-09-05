@@ -22,6 +22,7 @@
 
         <div class="nav-links">
             <a href="/dashboard">Dashboard</a>
+            <a href="/session-dashboard">Sessions</a>
             <a href="/admin">Admin</a>
         </div>
 
@@ -48,6 +49,10 @@
         loadUsers();
     }
 
+    if (window.location.pathname === "/session-dashboard") {
+        requireAuth();
+        loadSessionDashboard();
+    }
     </script>
 
 </body>

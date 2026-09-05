@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 import os
 
 from database import Base
-from models import *
+from models.models import *
 
 load_dotenv()
 
